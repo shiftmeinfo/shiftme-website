@@ -36,12 +36,16 @@ var SETTINGS = {
   ],
   HOLD_MINUTES: 30,                  // how long a slot is held while the customer pays (Stripe minimum is 30)
   BOOKINGS_TAB: "Bookings",
-  BLOCKED_TAB: "Blocked dates"
+  BLOCKED_TAB: "Blocked dates",
+  // Google Calendar: every Paid or Confirmed booking is added to this calendar automatically
+  CALENDAR_NAME: "ShiftMe Jobs",
+  JOB_HOURS: 4,                      // how long each job shows in the calendar
+  SLOT_START: { morning: "09:00", afternoon: "13:00" }
 };
 
 var HEADERS = ["Ref", "Created", "Status", "Move date", "Slot", "Package", "Extras", "Total (£)", "Paid (£)",
   "Name", "Phone", "Email", "From", "From access", "From parking", "To", "To access", "To parking", "Notes",
-  "Stripe session", "Slot id", "Token"];
+  "Stripe session", "Slot id", "Token", "Calendar event"];
 var STATUSES = ["Awaiting payment", "Paid", "Completed", "Cancelled", "Expired"];
 
 /* =========================================================================
@@ -60,7 +64,8 @@ function setup() {
   b.getRange("B2:B2000").setNumberFormat("dd/mm/yyyy hh:mm");
   b.setColumnWidth(6, 160); b.setColumnWidth(7, 240); b.setColumnWidth(13, 240); b.setColumnWidth(16, 240); b.setColumnWidth(19, 240);
   b.showColumns(1, b.getMaxColumns());
-  b.hideColumns(20, 3);   // Stripe session, Slot id, Token
+  b.hideColumns(20, 4);   // Stripe session, Slot id, Token, Calendar event
+  jobsCalendar();         // creates the "ShiftMe Jobs" calendar if it doesn't exist
 
   var x = ss.getSheetByName(SETTINGS.BLOCKED_TAB) || ss.insertSheet(SETTINGS.BLOCKED_TAB);
   if (x.getLastRow() === 0) {
@@ -222,6 +227,7 @@ function reconcile() {
     if (!sid) { if (ageMin > 10) setCell(i + 2, "Status", "Expired"); return; }
     try { applySession(stripe(sk, "get", "checkout/sessions/" + sid)); } catch (e) { console.error(e); }
   });
+  try { syncCalendar(); } catch (e) { console.error(e); }
 }
 
 /* Updates the sheet from a Stripe session. Sends emails the first time a booking becomes Paid. */
@@ -243,7 +249,10 @@ function applySession(session) {
     SpreadsheetApp.flush();
     found = findRow("Ref", ref);
   } finally { lock.releaseLock(); }
-  if (justPaid) { try { sendPaidEmails(found); } catch (e) { console.error(e); } }
+  if (justPaid) {
+    try { sendPaidEmails(found); } catch (e) { console.error(e); }
+    try { syncCalendar(); } catch (e) { console.error(e); }
+  }
   return {
     status: found.get("Status"), ref: ref, email: found.get("Email"), total: found.get("Total (£)"),
     date: key(found.get("Move date")), slot: found.get("Slot"), pkg: found.get("Package")
@@ -346,6 +355,67 @@ function blockedDates() {
   if (!sheet || sheet.getLastRow() < 2) return [];
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
     .map(function (r) { return key(r[0]); }).filter(Boolean);
+}
+
+/* =========================================================================
+   GOOGLE CALENDAR
+   Adds Paid and Confirmed bookings (including ones you type in yourself) to the
+   "ShiftMe Jobs" calendar, and removes the event if you change Status to Cancelled.
+   Runs straight after payment and every 5 minutes.
+   ========================================================================= */
+function jobsCalendar() {
+  var cals = CalendarApp.getCalendarsByName(SETTINGS.CALENDAR_NAME);
+  if (cals.length) return cals[0];
+  return CalendarApp.createCalendar(SETTINGS.CALENDAR_NAME, { color: CalendarApp.Color.GREEN, timeZone: SETTINGS.TIMEZONE });
+}
+function syncCalendar() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return;
+  try {
+    var sheet = bookingsSheet(); if (sheet.getLastRow() < 2) return;
+    var col = colMap(sheet); if (col["Calendar event"] == null) return;   // run setup() first
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+    var cal = null;
+    rows.forEach(function (r, i) {
+      var status = String(r[col["Status"]] || "").toLowerCase();
+      var eventId = r[col["Calendar event"]];
+      var wanted = (status === "paid" || status === "confirmed" || status === "completed") && r[col["Move date"]];
+      if (wanted && !eventId) {
+        cal = cal || jobsCalendar();
+        var ev = createJobEvent(cal, r, col);
+        if (ev) setCell(i + 2, "Calendar event", ev.getId());
+      } else if (!wanted && eventId && (status === "cancelled" || status === "expired")) {
+        cal = cal || jobsCalendar();
+        try { var old = cal.getEventById(eventId); if (old) old.deleteEvent(); } catch (e) { console.error(e); }
+        setCell(i + 2, "Calendar event", "");
+      }
+    });
+  } finally { lock.releaseLock(); }
+}
+function createJobEvent(cal, r, col) {
+  var day = key(r[col["Move date"]]); if (!day) return null;
+  var slotId = String(r[col["Slot id"]] || guessSlot(r[col["Slot"]]) || "morning");
+  var start = Utilities.parseDate(day + " " + (SETTINGS.SLOT_START[slotId] || "09:00"), SETTINGS.TIMEZONE, "yyyy-MM-dd HH:mm");
+  var end = new Date(start.getTime() + SETTINGS.JOB_HOURS * 3600000);
+  var phone = String(r[col["Phone"]] || "").replace(/^'/, "");
+  var title = r[col["Package"]] + ", " + r[col["Name"]] + " (" + r[col["Ref"]] + ")";
+  var desc = [
+    "Ref: " + r[col["Ref"]],
+    "Customer: " + r[col["Name"]] + ", " + phone,
+    "Email: " + r[col["Email"]],
+    "",
+    "From: " + r[col["From"]] + " (" + r[col["From access"]] + ", " + r[col["From parking"]] + ")",
+    "To: " + r[col["To"]] + " (" + r[col["To access"]] + ", " + r[col["To parking"]] + ")",
+    "",
+    "Move: " + r[col["Package"]],
+    r[col["Extras"]] ? "Extras: " + r[col["Extras"]] : "",
+    r[col["Notes"]] ? "Notes: " + r[col["Notes"]] : "",
+    "Paid: " + (r[col["Paid (£)"]] !== "" ? money(r[col["Paid (£)"]]) : "not paid online")
+  ].filter(function (x, i, a) { return x !== "" || (a[i - 1] !== ""); }).join("\n");
+  var ev = cal.createEvent(title, start, end, { description: desc, location: String(r[col["From"]] || "") });
+  ev.addPopupReminder(24 * 60);   // reminder the day before
+  ev.addPopupReminder(60);        // and an hour before
+  return ev;
 }
 
 /* =========================================================================

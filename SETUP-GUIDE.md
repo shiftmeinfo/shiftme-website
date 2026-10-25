@@ -103,6 +103,7 @@ After a minute your site is also viewable at `https://YOUR-USERNAME.github.io/sh
 - When a customer clicks Pay, a row appears as **Awaiting payment** and their slot is held for 30 minutes.
 - When Stripe takes the payment, the row changes to **Paid** and you both get an email. Change it to **Completed** after the job.
 - If they don't pay within 30 minutes it changes to **Expired** and the slot opens again.
+- **Calendar:** every Paid booking is added to the **ShiftMe Jobs** Google Calendar (with reminders the day before and an hour before). Bookings you add yourself with Status **Confirmed** are added too, and changing a Status to **Cancelled** removes the event within 5 minutes.
 - **Refunds:** refund the customer in your Stripe dashboard (Payments → the payment → Refund), then change Status to **Cancelled** to free the slot.
 - **Cancelled** frees up that slot on the calendar straight away.
 - Took a booking by phone or WhatsApp? Add a row yourself with the **Move date** and **Slot** (type "Morning" or "Afternoon") so the calendar knows.
