@@ -1,13 +1,24 @@
 /**
- * ShiftMe booking system (Google Apps Script)
- * -------------------------------------------
- * Lives inside a Google Sheet in shiftmeinfo@gmail.com.
- *  - The website asks this script which dates are free.
- *  - New bookings are added to the "Bookings" tab.
- *  - Once a date has MAX_BOOKINGS_PER_DAY bookings it is blocked automatically.
- *  - Change a booking's Status to "Cancelled" and that slot opens up again.
- *  - Add a date to the "Blocked dates" tab to close a day (holidays, van service).
- * Setup steps are in SETUP-GUIDE.md, Part 1.
+ * ShiftMe booking system with Stripe payments (Google Apps Script)
+ * ----------------------------------------------------------------
+ * Lives inside the "ShiftMe Bookings" Google Sheet in shiftmeinfo@gmail.com.
+ *
+ * How a booking works:
+ *  1. The customer fills in the form and clicks Pay. This script checks the date is free,
+ *     works out the price itself (from the prices in config.js on the website, so nobody
+ *     can change the price in their browser), adds a row marked "Awaiting payment",
+ *     and sends the customer to a Stripe payment page.
+ *  2. The slot is held for 30 minutes while they pay.
+ *  3. When Stripe confirms payment the row changes to "Paid" and both of you get an email.
+ *     If they don't pay in 30 minutes the row changes to "Expired" and the slot opens again.
+ *
+ * Rules:
+ *  - A date is blocked automatically once it has MAX_BOOKINGS_PER_DAY bookings.
+ *  - Change a Status to "Cancelled" to free a slot (refund the customer in Stripe).
+ *  - Add a date to the "Blocked dates" tab to close a day.
+ *
+ * Your Stripe secret key is NOT stored in this code. It goes in
+ * Project Settings > Script properties as STRIPE_SECRET_KEY (see the setup steps).
  */
 
 var SETTINGS = {
@@ -17,29 +28,40 @@ var SETTINGS = {
   WHATSAPP: "+44 7457 411586",
   PHONE: "020 3488 8610",
   TIMEZONE: "Europe/London",
+  SITE_URL: "https://shiftme.uk/",
+  // Where the script reads your prices from (first one that works is used)
+  CONFIG_URLS: [
+    "https://raw.githubusercontent.com/shiftmeinfo/shiftme-website/main/config.js",
+    "https://shiftme.uk/config.js"
+  ],
+  HOLD_MINUTES: 30,                  // how long a slot is held while the customer pays (Stripe minimum is 30)
   BOOKINGS_TAB: "Bookings",
-  BLOCKED_TAB: "Blocked dates",
-  VALID_SLOTS: ["morning", "afternoon"]
+  BLOCKED_TAB: "Blocked dates"
 };
 
-var HEADERS = ["Ref", "Created", "Status", "Move date", "Slot", "Package", "Extras", "Total (£)", "Deposit (£)",
-  "Balance (£)", "Name", "Phone", "Email", "From", "From access", "From parking", "To", "To access", "To parking", "Notes", "Slot id"];
+var HEADERS = ["Ref", "Created", "Status", "Move date", "Slot", "Package", "Extras", "Total (£)", "Paid (£)",
+  "Name", "Phone", "Email", "From", "From access", "From parking", "To", "To access", "To parking", "Notes",
+  "Stripe session", "Slot id", "Token"];
+var STATUSES = ["Awaiting payment", "Paid", "Completed", "Cancelled", "Expired"];
 
-/* Run this once from the editor (select "setup" then press Run) */
+/* =========================================================================
+   SETUP: run once from the editor (choose "setup" and press Run).
+   Safe to run again: it updates headings and the payment checker.
+   ========================================================================= */
 function setup() {
   var ss = SpreadsheetApp.getActive();
   var b = ss.getSheetByName(SETTINGS.BOOKINGS_TAB) || ss.insertSheet(SETTINGS.BOOKINGS_TAB);
-  if (b.getLastRow() === 0) {
-    b.appendRow(HEADERS);
-    b.getRange(1, 1, 1, HEADERS.length).setFontWeight("bold").setBackground("#0D1B2A").setFontColor("#FFFFFF");
-    b.setFrozenRows(1);
-    var rule = SpreadsheetApp.newDataValidation().requireValueInList(["Pending deposit", "Confirmed", "Completed", "Cancelled"], true).build();
-    b.getRange("C2:C2000").setDataValidation(rule);
-    b.getRange("D2:D2000").setNumberFormat("ddd dd mmm yyyy");
-    b.getRange("B2:B2000").setNumberFormat("dd/mm/yyyy hh:mm");
-    b.setColumnWidth(6, 160); b.setColumnWidth(7, 240); b.setColumnWidth(14, 240); b.setColumnWidth(17, 240); b.setColumnWidth(20, 240);
-    b.hideColumns(HEADERS.length);
-  }
+  b.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS])
+    .setFontWeight("bold").setBackground("#0D1B2A").setFontColor("#FFFFFF");
+  b.setFrozenRows(1);
+  var rule = SpreadsheetApp.newDataValidation().requireValueInList(STATUSES.concat(["Confirmed"]), true).build();
+  b.getRange("C2:C2000").setDataValidation(rule);
+  b.getRange("D2:D2000").setNumberFormat("ddd dd mmm yyyy");
+  b.getRange("B2:B2000").setNumberFormat("dd/mm/yyyy hh:mm");
+  b.setColumnWidth(6, 160); b.setColumnWidth(7, 240); b.setColumnWidth(13, 240); b.setColumnWidth(16, 240); b.setColumnWidth(19, 240);
+  b.showColumns(1, b.getMaxColumns());
+  b.hideColumns(20, 3);   // Stripe session, Slot id, Token
+
   var x = ss.getSheetByName(SETTINGS.BLOCKED_TAB) || ss.insertSheet(SETTINGS.BLOCKED_TAB);
   if (x.getLastRow() === 0) {
     x.appendRow(["Date", "Reason"]);
@@ -47,64 +69,268 @@ function setup() {
     x.getRange("A2:A500").setNumberFormat("dd/mm/yyyy");
     x.setFrozenRows(1);
   }
-  var s1 = ss.getSheetByName("Sheet1"); if (s1 && ss.getSheets().length > 2 && s1.getLastRow() === 0) ss.deleteSheet(s1);
+
+  // Checks unpaid bookings every 5 minutes (catches customers who paid but closed the page)
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "reconcile") ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger("reconcile").timeBased().everyMinutes(5).create();
+
+  var sk = PropertiesService.getScriptProperties().getProperty("STRIPE_SECRET_KEY");
+  Logger.log(sk ? "Setup done. Stripe key found (" + (sk.indexOf("sk_live") === 0 ? "LIVE mode" : "TEST mode") + ")."
+                 : "Setup done. Now add STRIPE_SECRET_KEY in Project Settings > Script properties.");
 }
 
-/* ---------- website asks for availability ---------- */
+/* =========================================================================
+   WEBSITE REQUESTS
+   ========================================================================= */
 function doGet(e) {
-  var action = (e && e.parameter && e.parameter.action) || "availability";
-  if (action !== "availability") return json({ ok: false, code: "unknown" });
-  return json({ ok: true, max: SETTINGS.MAX_BOOKINGS_PER_DAY, days: countDays(), blocked: blockedDates() });
+  var p = (e && e.parameter) || {};
+  var action = p.action || "availability";
+  try {
+    if (action === "availability") return json({ ok: true, max: SETTINGS.MAX_BOOKINGS_PER_DAY, days: countDays(), blocked: blockedDates() });
+    if (action === "confirm") return json(confirmPayment(p.session_id));
+    if (action === "cancel") return json(cancelUnpaid(p.ref, p.token));
+  } catch (err) {
+    console.error(err);
+    return json({ ok: false, code: "error", message: "Something went wrong. Please WhatsApp us on " + SETTINGS.WHATSAPP + "." });
+  }
+  return json({ ok: false, code: "unknown" });
 }
 
-/* ---------- website sends a booking ---------- */
 function doPost(e) {
   var data;
   try { data = JSON.parse(e.postData.contents); } catch (err) { return json({ ok: false, code: "invalid", message: "Something went wrong sending your booking. Please try again." }); }
-  if (data.website) return json({ ok: true, ref: "SM-OK" });           // spam bot filled the hidden field
-  var problem = check(data);
-  if (problem) return json({ ok: false, code: "invalid", message: problem });
+  if (data.website) return json({ ok: false, code: "invalid", message: "Please try again." });   // spam bot filled the hidden field
+  try { return json(startBooking(data)); }
+  catch (err) {
+    console.error(err);
+    return json({ ok: false, code: "error", message: "We couldn't start your payment. Please try again, or WhatsApp us on " + SETTINGS.WHATSAPP + "." });
+  }
+}
 
+/* ---------- 1. Customer clicks Pay ---------- */
+function startBooking(d) {
+  var cfg = siteConfig();
+  var quote = priceBooking(cfg, d);
+  if (quote.error) return { ok: false, code: "invalid", message: quote.error };
+  var problem = checkDetails(cfg, d);
+  if (problem) return { ok: false, code: "invalid", message: problem };
+  var sk = stripeKey();
+  if (!sk) return { ok: false, code: "error", message: "Online payment isn't set up yet. Please WhatsApp us on " + SETTINGS.WHATSAPP + " to book." };
+
+  var ref, token = Utilities.getUuid().replace(/-/g, "").slice(0, 16), rowNum;
   var lock = LockService.getScriptLock();
-  try { lock.waitLock(20000); } catch (err) { return json({ ok: false, code: "busy", message: "We're busy right now. Please try again in a moment." }); }
+  try { lock.waitLock(20000); } catch (err) { return { ok: false, code: "busy", message: "We're busy right now. Please try again in a moment." }; }
   try {
-    if (blockedDates().indexOf(data.date) > -1) return json({ ok: false, code: "full" });
-    var day = countDays()[data.date] || { count: 0, slots: [] };
-    if (day.count >= SETTINGS.MAX_BOOKINGS_PER_DAY) return json({ ok: false, code: "full" });
-    if (day.slots.indexOf(data.slot) > -1) return json({ ok: false, code: "slot_taken" });
+    if (blockedDates().indexOf(d.date) > -1) return { ok: false, code: "full" };
+    var day = countDays()[d.date] || { count: 0, slots: [] };
+    if (day.count >= SETTINGS.MAX_BOOKINGS_PER_DAY) return { ok: false, code: "full" };
+    if (day.slots.indexOf(d.slot) > -1) return { ok: false, code: "slot_taken" };
 
-    var ref = makeRef();
-    var sheet = SpreadsheetApp.getActive().getSheetByName(SETTINGS.BOOKINGS_TAB);
-    var extras = (data.extras || []).map(function (x) { return clean(x.label) + " £" + num(x.cost); }).join(", ");
-    var p = data.date.split("-");
-    sheet.appendRow([ref, new Date(), "Pending deposit", new Date(+p[0], +p[1] - 1, +p[2]), clean(data.slotLabel), clean(data.packageName),
-      extras, num(data.total), num(data.deposit), num(data.total) - num(data.deposit),
-      clean(data.name), textCell(data.phone), clean(data.email), clean(data.from), clean(data.fromAccess), clean(data.fromParking),
-      clean(data.to), clean(data.toAccess), clean(data.toParking), clean(data.notes), data.slot]);
+    ref = makeRef();
+    var sheet = bookingsSheet(), p = d.date.split("-");
+    var row = {
+      "Ref": ref, "Created": new Date(), "Status": "Awaiting payment",
+      "Move date": new Date(+p[0], +p[1] - 1, +p[2]), "Slot": quote.slotLabel, "Package": quote.pkg.name,
+      "Extras": quote.extrasText, "Total (£)": quote.total, "Paid (£)": "",
+      "Name": clean(d.name), "Phone": textCell(d.phone), "Email": clean(d.email),
+      "From": clean(d.from), "From access": clean(d.fromAccess), "From parking": clean(d.fromParking),
+      "To": clean(d.to), "To access": clean(d.toAccess), "To parking": clean(d.toParking),
+      "Notes": clean(d.notes), "Stripe session": "", "Slot id": d.slot, "Token": token
+    };
+    sheet.appendRow(HEADERS.map(function (h) { return row[h]; }));
+    rowNum = sheet.getLastRow();
     SpreadsheetApp.flush();
   } finally {
     lock.releaseLock();
   }
 
-  try { sendEmails(ref, data, extras); } catch (err) { console.error(err); }   // booking still saved if email fails
-  return json({ ok: true, ref: ref });
+  // Create the Stripe payment page
+  try {
+    var session = createCheckout(sk, ref, token, d, quote);
+    setCell(rowNum, "Stripe session", session.id);
+    return { ok: true, ref: ref, url: session.url };
+  } catch (err) {
+    console.error(err);
+    setCell(rowNum, "Status", "Expired");   // release the slot again
+    return { ok: false, code: "error", message: "We couldn't open the payment page. Please try again, or WhatsApp us on " + SETTINGS.WHATSAPP + "." };
+  }
 }
 
-/* ---------- helpers ---------- */
+function createCheckout(sk, ref, token, d, q) {
+  var nice = niceDate(d.date);
+  var f = {
+    "mode": "payment",
+    "customer_email": d.email,
+    "client_reference_id": ref,
+    "metadata[ref]": ref,
+    "metadata[move_date]": d.date,
+    "metadata[slot]": d.slot,
+    "payment_intent_data[description]": "ShiftMe " + ref + ", " + q.pkg.name + ", " + nice,
+    "payment_intent_data[metadata][ref]": ref,
+    "expires_at": String(Math.floor(Date.now() / 1000) + SETTINGS.HOLD_MINUTES * 60 + 60),
+    "success_url": SETTINGS.SITE_URL + "?paid={CHECKOUT_SESSION_ID}#book",
+    "cancel_url": SETTINGS.SITE_URL + "?cancelled=" + encodeURIComponent(ref) + "&t=" + token + "#book",
+    "locale": "en-GB"
+  };
+  var lines = [{ name: q.pkg.name + " removal", desc: nice + ", " + q.slotLabel, amount: q.pkg.price, qty: 1 }]
+    .concat(q.extras.map(function (x) { return { name: x.name, desc: x.unitLabel, amount: x.unit, qty: x.qty }; }));
+  lines.forEach(function (l, i) {
+    var k = "line_items[" + i + "]";
+    f[k + "[quantity]"] = String(l.qty);
+    f[k + "[price_data][currency]"] = "gbp";
+    f[k + "[price_data][unit_amount]"] = String(Math.round(l.amount * 100));
+    f[k + "[price_data][product_data][name]"] = l.name;
+    if (l.desc) f[k + "[price_data][product_data][description]"] = l.desc;
+  });
+  return stripe(sk, "post", "checkout/sessions", f);
+}
+
+/* ---------- 2. Customer comes back from Stripe ---------- */
+function confirmPayment(sessionId) {
+  if (!/^cs_[A-Za-z0-9_]+$/.test(sessionId || "")) return { ok: false, code: "invalid" };
+  var session = stripe(stripeKey(), "get", "checkout/sessions/" + sessionId);
+  var r = applySession(session);
+  if (!r) return { ok: false, code: "not_found", message: "We couldn't find your booking. Please WhatsApp us on " + SETTINGS.WHATSAPP + "." };
+  return { ok: true, paid: r.status === "Paid" || r.status === "Completed", status: r.status, ref: r.ref, email: r.email, total: r.total, date: r.date, slot: r.slot, pkg: r.pkg };
+}
+
+/* ---------- Customer pressed Back on the Stripe page ---------- */
+function cancelUnpaid(ref, token) {
+  var found = findRow("Ref", ref);
+  if (!found || !token || found.get("Token") !== token) return { ok: false, code: "not_found" };
+  if (found.get("Status") !== "Awaiting payment") return { ok: true, status: found.get("Status") };
+  var sid = found.get("Stripe session");
+  if (sid) {
+    var session = stripe(stripeKey(), "get", "checkout/sessions/" + sid);
+    if (session.payment_status === "paid") { applySession(session); return { ok: true, status: "Paid" }; }
+    if (session.status === "open") { try { stripe(stripeKey(), "post", "checkout/sessions/" + sid + "/expire", {}); } catch (e) { console.error(e); } }
+  }
+  setCell(found.row, "Status", "Expired");
+  return { ok: true, status: "Expired" };
+}
+
+/* ---------- Runs every 5 minutes ---------- */
+function reconcile() {
+  var sk = stripeKey(); if (!sk) return;
+  var sheet = bookingsSheet(); if (sheet.getLastRow() < 2) return;
+  var col = colMap(sheet);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  rows.forEach(function (r, i) {
+    if (r[col["Status"]] !== "Awaiting payment") return;
+    var sid = r[col["Stripe session"]], created = r[col["Created"]];
+    var ageMin = created instanceof Date ? (Date.now() - created.getTime()) / 60000 : 999;
+    if (!sid) { if (ageMin > 10) setCell(i + 2, "Status", "Expired"); return; }
+    try { applySession(stripe(sk, "get", "checkout/sessions/" + sid)); } catch (e) { console.error(e); }
+  });
+}
+
+/* Updates the sheet from a Stripe session. Sends emails the first time a booking becomes Paid. */
+function applySession(session) {
+  var ref = session.client_reference_id || (session.metadata && session.metadata.ref);
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  var found, justPaid = false;
+  try {
+    found = findRow("Ref", ref);
+    if (!found || found.get("Stripe session") !== session.id) return null;
+    var status = found.get("Status");
+    if (session.payment_status === "paid" && status !== "Paid" && status !== "Completed") {
+      setCell(found.row, "Status", "Paid");
+      setCell(found.row, "Paid (£)", (session.amount_total || 0) / 100);
+      justPaid = true;
+    } else if (session.status === "expired" && status === "Awaiting payment") {
+      setCell(found.row, "Status", "Expired");
+    }
+    SpreadsheetApp.flush();
+    found = findRow("Ref", ref);
+  } finally { lock.releaseLock(); }
+  if (justPaid) { try { sendPaidEmails(found); } catch (e) { console.error(e); } }
+  return {
+    status: found.get("Status"), ref: ref, email: found.get("Email"), total: found.get("Total (£)"),
+    date: key(found.get("Move date")), slot: found.get("Slot"), pkg: found.get("Package")
+  };
+}
+
+/* =========================================================================
+   PRICES (read from the website's config.js so there's only one price list)
+   ========================================================================= */
+function siteConfig() {
+  var cache = CacheService.getScriptCache(), hit = cache.get("site_config");
+  if (hit) return JSON.parse(hit);
+  var lastErr;
+  for (var i = 0; i < SETTINGS.CONFIG_URLS.length; i++) {
+    try {
+      var res = UrlFetchApp.fetch(SETTINGS.CONFIG_URLS[i] + "?t=" + Date.now(), { muteHttpExceptions: true });
+      if (res.getResponseCode() !== 200) continue;
+      var win = {};
+      new Function("window", res.getContentText())(win);
+      var cfg = win.SHIFTME_CONFIG;
+      if (cfg && cfg.PACKAGES) { cache.put("site_config", JSON.stringify(cfg), 300); return cfg; }
+    } catch (e) { lastErr = e; }
+  }
+  throw new Error("Could not load prices from the website. " + (lastErr || ""));
+}
+
+function priceBooking(cfg, d) {
+  var pkg = (cfg.PACKAGES || []).filter(function (p) { return p.id === d.packageId; })[0];
+  if (!pkg) return { error: "Please choose a move package." };
+  var slot = (cfg.SLOTS || []).filter(function (s) { return s.id === d.slot; })[0];
+  if (!slot) return { error: "Please pick a morning or afternoon arrival." };
+  var extras = [], total = pkg.price;
+  (d.extras || []).forEach(function (x) {
+    var a = (cfg.ADDONS || []).filter(function (y) { return y.id === x.id; })[0];
+    var qty = Math.floor(Number(x.qty) || 0);
+    if (!a || qty <= 0) return;
+    if (a.per === "once") qty = 1;
+    else if (a.per === "hour") qty = Math.min(Math.max(qty, a.min || 1), 20);
+    else qty = Math.min(qty, 20);
+    var label = a.per === "hour" ? a.name + " (" + qty + " hr" + (qty > 1 ? "s" : "") + ")" : (a.per === "item" && qty > 1 ? a.name + " x" + qty : a.name);
+    extras.push({ name: a.name, label: label, unit: a.price, qty: qty, cost: a.price * qty,
+      unitLabel: a.per === "hour" ? "£" + a.price + " an hour" : (a.per === "item" ? "£" + a.price + " each" : "") });
+    total += a.price * qty;
+  });
+  total = Math.round(total * 100) / 100;
+  return {
+    pkg: pkg, extras: extras, total: total,
+    slotLabel: slot.label + " (" + slot.time + ")",
+    extrasText: extras.map(function (x) { return x.label + " " + money(x.cost); }).join(", ")
+  };
+}
+
+function checkDetails(cfg, d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || "")) return "Please pick a date.";
+  var p = d.date.split("-"), day = new Date(+p[0], +p[1] - 1, +p[2]);
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var minD = new Date(today); minD.setDate(minD.getDate() + (cfg.MIN_NOTICE_DAYS || 1));
+  var maxD = new Date(today); maxD.setDate(maxD.getDate() + (cfg.BOOK_AHEAD_DAYS || 120));
+  if (day < minD) return "Please pick a later date.";
+  if (day > maxD) return "That date is too far ahead to book online. Please WhatsApp us.";
+  if ((cfg.CLOSED_WEEKDAYS || []).indexOf(day.getDay()) > -1) return "We're closed that day. Please pick another date.";
+  if (!d.name || !d.phone || !d.email || !d.from || !d.to) return "Please fill in your name, contact details and both addresses.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return "Please check your email address.";
+  return "";
+}
+
+/* =========================================================================
+   AVAILABILITY
+   ========================================================================= */
 function countDays() {
-  var sheet = SpreadsheetApp.getActive().getSheetByName(SETTINGS.BOOKINGS_TAB);
-  var days = {};
+  var sheet = bookingsSheet(), days = {};
   if (!sheet || sheet.getLastRow() < 2) return days;
-  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, HEADERS.length).getValues();
-  var todayKey = key(new Date());
+  var col = colMap(sheet);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  var todayKey = key(new Date()), holdMs = (SETTINGS.HOLD_MINUTES + 5) * 60000;
   rows.forEach(function (r) {
-    var status = String(r[2]).toLowerCase(), d = r[3];
-    if (!d || status === "cancelled") return;
+    var status = String(r[col["Status"]] || "").toLowerCase(), d = r[col["Move date"]];
+    if (!d || status === "cancelled" || status === "expired") return;
+    if (status === "awaiting payment") {
+      var c = r[col["Created"]];
+      if (!(c instanceof Date) || Date.now() - c.getTime() > holdMs) return;   // payment window has passed
+    }
     var k = key(d);
     if (!k || k < todayKey) return;
     days[k] = days[k] || { count: 0, slots: [] };
     days[k].count++;
-    var slotId = String(r[20] || guessSlot(r[4]));
+    var slotId = String((col["Slot id"] != null && r[col["Slot id"]]) || guessSlot(r[col["Slot"]]));
     if (slotId) days[k].slots.push(slotId);
   });
   return days;
@@ -121,65 +347,88 @@ function blockedDates() {
   return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
     .map(function (r) { return key(r[0]); }).filter(Boolean);
 }
+
+/* =========================================================================
+   EMAILS (sent once payment is received)
+   ========================================================================= */
+function sendPaidEmails(f) {
+  var nice = niceDate(key(f.get("Move date")));
+  var lines = [
+    "Reference: " + f.get("Ref"),
+    "Date: " + nice + ", " + f.get("Slot"),
+    "Move: " + f.get("Package"),
+    f.get("Extras") ? "Extras: " + f.get("Extras") : "",
+    "From: " + f.get("From") + " (" + f.get("From access") + ", " + f.get("From parking") + ")",
+    "To: " + f.get("To") + " (" + f.get("To access") + ", " + f.get("To parking") + ")",
+    f.get("Notes") ? "Notes: " + f.get("Notes") : "",
+    "Paid: " + money(Number(f.get("Paid (£)")) || Number(f.get("Total (£)")))
+  ].filter(Boolean).join("\n");
+  var first = String(f.get("Name")).split(" ")[0];
+
+  MailApp.sendEmail({
+    to: SETTINGS.BUSINESS_EMAIL,
+    replyTo: f.get("Email"),
+    subject: "Paid booking " + f.get("Ref") + ": " + nice + " " + f.get("Slot"),
+    body: "New paid ShiftMe booking\n\n" + lines + "\n\nCustomer: " + f.get("Name") + "\nPhone: " + String(f.get("Phone")).replace(/^'/, "") + "\nEmail: " + f.get("Email")
+  });
+  MailApp.sendEmail({
+    to: f.get("Email"),
+    replyTo: SETTINGS.BUSINESS_EMAIL,
+    name: SETTINGS.BUSINESS_NAME,
+    subject: "Your ShiftMe move is booked: " + nice,
+    body: "Hi " + first + ",\n\nThanks for booking with ShiftMe. Your payment has been received and your move is confirmed.\n\n" + lines +
+      "\n\nNeed to change anything? Reply to this email or WhatsApp us on " + SETTINGS.WHATSAPP + ".\n\nThe ShiftMe team\nTap. Book. Move."
+  });
+}
+
+/* =========================================================================
+   HELPERS
+   ========================================================================= */
+function stripeKey() { return PropertiesService.getScriptProperties().getProperty("STRIPE_SECRET_KEY"); }
+function stripe(sk, method, path, form) {
+  var opts = { method: method, headers: { Authorization: "Bearer " + sk }, muteHttpExceptions: true };
+  if (form) opts.payload = form;
+  var res = UrlFetchApp.fetch("https://api.stripe.com/v1/" + path, opts);
+  var body = JSON.parse(res.getContentText());
+  if (res.getResponseCode() >= 300) throw new Error("Stripe: " + (body.error && body.error.message));
+  return body;
+}
+function bookingsSheet() { return SpreadsheetApp.getActive().getSheetByName(SETTINGS.BOOKINGS_TAB); }
+function colMap(sheet) {
+  var h = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0], m = {};
+  h.forEach(function (name, i) { m[String(name).trim()] = i; });
+  return m;
+}
+function findRow(header, value) {
+  if (!value) return null;
+  var sheet = bookingsSheet(); if (sheet.getLastRow() < 2) return null;
+  var col = colMap(sheet);
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  for (var i = rows.length - 1; i >= 0; i--) {
+    if (String(rows[i][col[header]]) === String(value)) {
+      var r = rows[i];
+      return { row: i + 2, get: function (h) { return r[col[h]]; } };
+    }
+  }
+  return null;
+}
+function setCell(row, header, value) {
+  var sheet = bookingsSheet(), col = colMap(sheet);
+  sheet.getRange(row, col[header] + 1).setValue(value);
+}
 function key(d) {
   if (!d) return "";
   if (!(d instanceof Date)) {
     var s = String(d).trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     if (m) d = new Date(+m[3], +m[2] - 1, +m[1]); else d = new Date(s);
     if (isNaN(d)) return "";
   }
   return Utilities.formatDate(d, SETTINGS.TIMEZONE, "yyyy-MM-dd");
 }
-function check(d) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || "")) return "Please pick a date.";
-  if (d.date <= key(new Date())) return "Please pick a date from tomorrow onwards.";
-  if (SETTINGS.VALID_SLOTS.indexOf(d.slot) === -1) return "Please pick a morning or afternoon arrival.";
-  if (!d.name || !d.phone || !d.email || !d.from || !d.to) return "Please fill in your name, contact details and both addresses.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) return "Please check your email address.";
-  return "";
-}
-function makeRef() {
-  return "SM" + Utilities.formatDate(new Date(), SETTINGS.TIMEZONE, "yyMMdd") + "-" + Math.floor(100 + Math.random() * 900);
-}
-function clean(v) { v = String(v == null ? "" : v).slice(0, 1000); return /^[=+\-@]/.test(v) ? "'" + v : v; }  // stops formula injection
-function textCell(v) { v = clean(v); return v.charAt(0) === "'" ? v : "'" + v; }   // keeps the leading 0 on phone numbers
-function num(v) { var n = Number(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; }
-function money(n) { return "£" + (n % 1 === 0 ? n : n.toFixed(2)); }
+function niceDate(ymd) { var p = ymd.split("-"); return Utilities.formatDate(new Date(+p[0], +p[1] - 1, +p[2]), SETTINGS.TIMEZONE, "EEEE d MMMM yyyy"); }
+function makeRef() { return "SM" + Utilities.formatDate(new Date(), SETTINGS.TIMEZONE, "yyMMdd") + "-" + Math.floor(1000 + Math.random() * 9000); }
+function clean(v) { v = String(v == null ? "" : v).slice(0, 1000); return /^[=+\-@]/.test(v) ? "'" + v : v; }   // stops formula injection
+function textCell(v) { v = clean(v); return v.charAt(0) === "'" ? v : "'" + v; }                                    // keeps the leading 0 on phone numbers
+function money(n) { n = Math.round(Number(n) * 100) / 100; return "£" + (n % 1 === 0 ? n : n.toFixed(2)); }
 function json(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-
-function sendEmails(ref, d, extras) {
-  var p = d.date.split("-");
-  var nice = Utilities.formatDate(new Date(+p[0], +p[1] - 1, +p[2]), SETTINGS.TIMEZONE, "EEEE d MMMM yyyy");
-  var lines = [
-    "Reference: " + ref,
-    "Date: " + nice + ", " + d.slotLabel,
-    "Move: " + d.packageName,
-    extras ? "Extras: " + extras : "",
-    "From: " + d.from + " (" + d.fromAccess + ", " + d.fromParking + ")",
-    "To: " + d.to + " (" + d.toAccess + ", " + d.toParking + ")",
-    d.notes ? "Notes: " + d.notes : "",
-    "Total: " + money(num(d.total)),
-    "Deposit: " + money(num(d.deposit)),
-    "Balance on the day: " + money(num(d.total) - num(d.deposit))
-  ].filter(Boolean).join("\n");
-
-  // To you
-  MailApp.sendEmail({
-    to: SETTINGS.BUSINESS_EMAIL,
-    replyTo: d.email,
-    subject: "New booking " + ref + ": " + nice + " " + d.slotLabel,
-    body: "New ShiftMe booking\n\n" + lines + "\n\nCustomer: " + d.name + "\nPhone: " + d.phone + "\nEmail: " + d.email +
-      "\n\nNext: send the deposit link, then change Status to Confirmed in the sheet."
-  });
-
-  // To the customer
-  MailApp.sendEmail({
-    to: d.email,
-    replyTo: SETTINGS.BUSINESS_EMAIL,
-    name: SETTINGS.BUSINESS_NAME,
-    subject: "Your ShiftMe booking " + ref,
-    body: "Hi " + d.name.split(" ")[0] + ",\n\nThanks for booking with ShiftMe. Here are your details:\n\n" + lines +
-      "\n\nWe'll be in touch shortly about your deposit. Your date is confirmed once it's paid.\n\n" +
-      "Need to change anything? Reply to this email or WhatsApp us on " + SETTINGS.WHATSAPP + ".\n\nThe ShiftMe team\nTap. Book. Move."
-  });
-}

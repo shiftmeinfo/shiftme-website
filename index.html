@@ -90,7 +90,7 @@
               <span class="price-big" id="qPrice">£325</span>
               <span class="price-sub" id="qName">1 bedroom flat</span>
             </div>
-            <div class="deposit-pill">Deposit today <strong id="qDeposit">£97.50</strong></div>
+            <div class="deposit-pill"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 7V5a4 4 0 1 1 8 0v2h.5A1.5 1.5 0 0 1 14 8.5v5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-5A1.5 1.5 0 0 1 3.5 7H4zm1.5 0h5V5a2.5 2.5 0 0 0-5 0v2z"/></svg>Pay securely by card</div>
           </div>
           <button class="btn btn-green btn-block" id="qBook">Choose a date</button>
           <button class="link-btn" id="qIncluded" aria-expanded="false">What's included</button>
@@ -106,7 +106,7 @@
         <ol class="steps">
           <li><span class="step-n">1</span><h3>Choose your move</h3><p>Pick a flat, house or small move package and add any extras like packing or furniture assembly.</p></li>
           <li><span class="step-n">2</span><h3>Pick a free date</h3><p>The calendar only lets you choose days we still have a van for, morning or afternoon.</p></li>
-          <li><span class="step-n">3</span><h3>Secure it with a deposit</h3><p>A 30% deposit holds your date. The rest is paid on the day of your move.</p></li>
+          <li><span class="step-n">3</span><h3>Pay and you're booked</h3><p>Pay securely by card, Apple Pay or Google Pay. Your move is confirmed the moment payment goes through.</p></li>
         </ol>
       </div>
     </section>
@@ -233,20 +233,21 @@
             <fieldset class="panel" data-panel="4" hidden>
               <legend>Check and confirm</legend>
               <dl class="review" id="review"></dl>
-              <label class="agree"><input type="checkbox" name="agree" required> I've read the <a href="booking-policy.html" target="_blank" rel="noopener">booking policy</a>, including deposits and cancellations.</label>
+              <label class="agree"><input type="checkbox" name="agree" required><span>I've read the <a href="booking-policy.html" target="_blank" rel="noopener">booking policy</a>, including payment and cancellations.</span></label>
+              <p class="pay-note">You'll be taken to Stripe, our secure payment provider. Your slot is held for 30 minutes while you pay.</p>
               <p class="form-error" id="formError" role="alert" hidden></p>
               <div class="panel-nav">
                 <button type="button" class="btn btn-ghost" data-back>Back</button>
-                <button type="submit" class="btn btn-green" id="submitBtn">Confirm booking</button>
+                <button type="submit" class="btn btn-green" id="submitBtn"><span id="payAmt">Pay securely</span></button>
               </div>
             </fieldset>
 
             <!-- Done -->
             <div class="panel done" data-panel="5" hidden tabindex="-1">
               <div class="done-mark" aria-hidden="true"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l7 7 15-16"/></svg></div>
-              <h3>Booking received</h3>
-              <p>Your reference is <strong id="doneRef"></strong>. We've emailed a copy to <strong id="doneEmail"></strong>.</p>
-              <div id="doneDeposit"></div>
+              <h3 id="doneTitle">Your move is booked</h3>
+              <p id="doneText">Your reference is <strong id="doneRef"></strong>. We've emailed your confirmation to <strong id="doneEmail"></strong>.</p>
+              <div id="doneDetail"></div>
               <button type="button" class="btn btn-ghost" id="newBooking">Make another booking</button>
             </div>
           </form>
@@ -261,10 +262,7 @@
             <div class="sum-total">
               <span>Total</span><strong id="sTotal">£0</strong>
             </div>
-            <div class="sum-dep">
-              <span>Deposit to secure</span><strong id="sDeposit">£0</strong>
-            </div>
-            <p class="sum-note">Balance paid on the day.</p>
+            <p class="sum-note">Paid in full when you book. No extra charges on the day.</p>
           </aside>
         </div>
       </div>
@@ -275,8 +273,8 @@
       <div class="wrap narrow">
         <h2>Questions people ask</h2>
         <details><summary>What if I have more than the package lists?</summary><p>Pick the package closest to your move and tell us about the extra items in the notes. We'll confirm any difference before your move day, so there are no surprises.</p></details>
-        <details><summary>How does the deposit work?</summary><p>Your deposit is 30% of the package price. It secures your date and your ShiftMe team. The remaining balance is due on the day of your move.</p></details>
-        <details><summary>Can I cancel?</summary><p>Cancel 7 or more days before your move and we refund your deposit in full. Cancel 3 to 6 days before and we refund half. Cancellations with less than 72 hours' notice, or no shows, are non refundable.</p></details>
+        <details><summary>How do I pay?</summary><p>You pay the full price online when you book, by card, Apple Pay or Google Pay. Payments are handled securely by Stripe, so we never see your card details. Your move is confirmed as soon as payment goes through.</p></details>
+        <details><summary>Can I cancel?</summary><p>Cancel 7 or more days before your move and we refund you in full. Cancel 3 to 6 days before and we refund half. Cancellations with less than 72 hours' notice, or no shows, are non refundable.</p></details>
         <details><summary>Can I change my date?</summary><p>Yes. You can move your booking once for free with at least 72 hours' notice, subject to availability. Just get in touch.</p></details>
         <details><summary>Why is a date crossed out?</summary><p>We run a set number of jobs a day so every move gets our full attention. Once a day is full it closes automatically. Message us on WhatsApp if you're flexible and we'll tell you the nearest free day.</p></details>
         <details><summary>When are you open?</summary><p>7 days a week, 9am to 5pm. You can book online any time.</p></details>

@@ -12,7 +12,6 @@ window.SHIFTME_CONFIG = {
 
   // Booking rules
   MAX_BOOKINGS_PER_DAY: 2,     // a date is blocked automatically once it has this many bookings
-  DEPOSIT_RATE: 0.30,          // 30% of the package price
   MIN_NOTICE_DAYS: 1,          // 1 = customers can book from tomorrow onwards
   BOOK_AHEAD_DAYS: 120,        // how far ahead the calendar goes
   CLOSED_WEEKDAYS: [],         // e.g. [0] closes Sundays. 0 Sun, 1 Mon ... 6 Sat
@@ -22,14 +21,6 @@ window.SHIFTME_CONFIG = {
     { id: "morning",   label: "Morning",   time: "9am start" },
     { id: "afternoon", label: "Afternoon", time: "1pm start" }
   ],
-
-  // Optional: a Stripe (or SumUp, PayPal) payment link per package for the deposit.
-  // Leave blank and customers are told you'll send them a deposit link.
-  DEPOSIT_LINKS: {
-    f1: "", f2: "", f3: "",
-    h1: "", h2: "", h3: "", h4: "",
-    s1: "", s2: ""
-  },
 
   // Contact details
   PHONE_DISPLAY: "020 3488 8610",

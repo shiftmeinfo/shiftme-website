@@ -33,7 +33,6 @@
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function slotById(id) { return C.SLOTS.filter(function (s) { return s.id === id; })[0]; }
-  function deposit() { return Math.round(PK[S.pkg].price * C.DEPOSIT_RATE * 100) / 100; }
   function addonCost(id) { var a = AD[id], q = S.addons[id] || 0; return q * a.price; }
   function addonLabel(id) {
     var a = AD[id], q = S.addons[id];
@@ -92,7 +91,6 @@
     $$("#qSizes button").forEach(function (b) { b.setAttribute("aria-checked", b.dataset.id === S.pkg ? "true" : "false"); });
     countTo($("#qPrice"), shownPrice, p.price); shownPrice = p.price;
     $("#qName").textContent = p.name;
-    $("#qDeposit").textContent = money(deposit());
     $("#qItems").innerHTML = p.items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("");
     loadVan(p.load);
   }
@@ -140,7 +138,7 @@
       var show = p.items.slice(0, 6), rest = p.items.length - show.length;
       return '<article class="p-card"><h3>' + esc(p.name) + '</h3>' +
         '<p class="p-price">' + money(p.price) + (p.group === "small" ? " <small>from</small>" : "") + "</p>" +
-        '<p class="muted" style="margin:0;font-size:.85rem">' + money(Math.round(p.price * C.DEPOSIT_RATE * 100) / 100) + " deposit to book</p>" +
+        '<p class="muted" style="margin:0;font-size:.85rem">Paid in full when you book</p>' +
         '<ul data-all="' + esc(JSON.stringify(p.items)) + '">' + show.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>" +
         (rest > 0 ? '<button class="more" type="button">Show all ' + p.items.length + " items</button>" : "") +
         '<button class="btn btn-navy btn-block" type="button" data-book="' + p.id + '">Book this move</button></article>';
@@ -303,7 +301,7 @@
     $("#sExtrasRow").hidden = !ex.length;
     $("#sExtras").textContent = ex.map(addonLabel).join(", ");
     $("#sTotal").textContent = money(total());
-    $("#sDeposit").textContent = money(deposit());
+    $("#payAmt").textContent = "Pay " + money(total()) + " securely";
   }
 
   /* ---------- wizard ---------- */
@@ -370,8 +368,7 @@
       ["From", esc(v.from) + "<br><span class='muted'>" + esc(v.fromAccess) + ", " + esc(v.fromParking) + "</span>"],
       ["To", esc(v.to) + "<br><span class='muted'>" + esc(v.toAccess) + ", " + esc(v.toParking) + "</span>"],
       ["Contact", esc(v.name) + "<br>" + esc(v.phone) + "<br>" + esc(v.email)],
-      ["Total", "<strong>" + money(total()) + "</strong>"],
-      ["Deposit today", "<strong>" + money(deposit()) + "</strong>, balance of " + money(total() - deposit()) + " on the day"]
+      ["Total to pay now", "<strong>" + money(total()) + "</strong>"]
     ];
     if (v.notes) rows.splice(6, 0, ["Notes", esc(v.notes)]);
     $("#review").innerHTML = rows.map(function (r) { return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>"; }).join("");
@@ -386,18 +383,19 @@
       action: "book",
       date: S.date, slot: S.slot, slotLabel: sl.label + " (" + sl.time + ")",
       packageId: S.pkg, packageName: PK[S.pkg].name, packagePrice: PK[S.pkg].price,
-      extras: chosenAddons().map(function (k) { return { id: k, label: addonLabel(k), cost: addonCost(k) }; }),
-      total: total(), deposit: deposit(),
+      extras: chosenAddons().map(function (k) { return { id: k, qty: S.addons[k], label: addonLabel(k), cost: addonCost(k) }; }),
+      total: total(),
       name: v.name, phone: v.phone, email: v.email,
       from: v.from, fromAccess: v.fromAccess, fromParking: v.fromParking,
       to: v.to, toAccess: v.toAccess, toParking: v.toParking,
       notes: v.notes, website: v.website
     };
     S.submitting = true;
-    var btn = $("#submitBtn"); btn.disabled = true; btn.textContent = "Booking…";
+    var btn = $("#submitBtn"), btnHtml = btn.innerHTML; btn.disabled = true; btn.textContent = "Opening secure payment…";
     var finish = function (res) {
-      S.submitting = false; btn.disabled = false; btn.textContent = "Confirm booking";
-      if (res && res.ok) return showDone(res.ref, v.email);
+      if (res && res.ok && res.url) { savePending(); window.location.href = res.url; return; }
+      S.submitting = false; btn.disabled = false; btn.innerHTML = btnHtml;
+      if (res && res.ok) return showDone({ ref: res.ref, email: v.email, paid: false });
       if (res && (res.code === "full" || res.code === "slot_taken")) {
         S.loaded = false; S.date = null; S.slot = null; goStep(2);
         stepError(2, "Sorry, someone just booked that slot. Please pick another time.");
@@ -411,7 +409,7 @@
         if (info.count >= C.MAX_BOOKINGS_PER_DAY) return finish({ ok: false, code: "full" });
         if (info.slots.indexOf(S.slot) > -1) return finish({ ok: false, code: "slot_taken" });
         var list = demoStore(true); list.push({ date: S.date, slot: S.slot }); demoStore(false, list);
-        finish({ ok: true, ref: "SM-DEMO" + Math.floor(1000 + Math.random() * 9000) });
+        finish({ ok: true, ref: "SM-DEMO" + Math.floor(1000 + Math.random() * 9000), demo: true });
       }, 600);
       return;
     }
@@ -421,25 +419,64 @@
       .catch(function () { finish(null); });
   });
 
-  function showDone(ref, email) {
-    $("#doneRef").textContent = ref;
-    $("#doneEmail").textContent = email;
-    var link = C.DEPOSIT_LINKS[S.pkg], dep = money(deposit());
-    $("#doneDeposit").innerHTML = link
-      ? '<div class="dep-box"><p>Pay your <strong>' + dep + "</strong> deposit now to lock in your date.</p>" +
-        '<a class="btn btn-green" href="' + esc(link) + '" target="_blank" rel="noopener">Pay ' + dep + " deposit</a></div>"
-      : '<div class="dep-box"><p>We\'ll message you shortly with a secure link to pay your <strong>' + dep + "</strong> deposit. Your date is confirmed once it's paid.</p></div>";
+  function showDone(r) {
+    $("#doneText").innerHTML = "Your reference is <strong>" + esc(r.ref || "") + "</strong>. We've emailed your confirmation to <strong>" + esc(r.email || "you") + "</strong>.";
+    $("#doneTitle").textContent = r.paid ? "Your move is booked" : "Booking received";
+    $("#doneDetail").innerHTML = r.paid
+      ? '<div class="dep-box"><p><strong>' + money(Number(r.total) || 0) + " paid.</strong> " + (r.date ? esc(prettyDate(r.date, true)) + (r.slot ? ", " + esc(String(r.slot).toLowerCase()) : "") + ". " : "") + "See you then!</p></div>"
+      : '<div class="dep-box"><p>' + (DEMO ? "Preview mode, so no payment was taken." : "We'll be in touch to confirm your move.") + "</p></div>";
     goStep(5);
     var done = $('[data-panel="5"]'); done.focus({ preventScroll: true });
     scrollToBook();
     S.loaded = false;
   }
+  function showReturnMessage(title, html) {
+    $("#doneTitle").textContent = title;
+    $("#doneText").innerHTML = html;
+    $("#doneDetail").innerHTML = "";
+    goStep(5); scrollToBook();
+  }
+
+  /* ---------- coming back from Stripe ---------- */
+  function savePending() { try { sessionStorage.setItem("shiftme_pending", JSON.stringify({ pkg: S.pkg, addons: S.addons })); } catch (e) {} }
+  function restorePending() {
+    try { var p = JSON.parse(sessionStorage.getItem("shiftme_pending") || "null"); if (p) { S.addons = p.addons || {}; choosePkg(p.pkg); renderAddons(); } } catch (e) {}
+  }
+  function handleReturn() {
+    var q = new URLSearchParams(location.search), paid = q.get("paid"), cancelled = q.get("cancelled");
+    if (!paid && !cancelled) return false;
+    try { history.replaceState(null, "", location.pathname + "#book"); } catch (e) {}
+    if (paid) {
+      showReturnMessage("Confirming your payment…", "This only takes a moment.");
+      var tries = 0;
+      (function check() {
+        fetch(C.API_URL + "?action=confirm&session_id=" + encodeURIComponent(paid))
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok && res.paid) { try { sessionStorage.removeItem("shiftme_pending"); } catch (e) {} return showDone(res); }
+            if (++tries < 6) return setTimeout(check, 2000);
+            showReturnMessage("We're checking your payment", "If your payment went through you'll get a confirmation email shortly. Questions? WhatsApp us on +" + esc(C.WHATSAPP) + ".");
+          })
+          .catch(function () {
+            if (++tries < 6) return setTimeout(check, 2000);
+            showReturnMessage("We're checking your payment", "If your payment went through you'll get a confirmation email shortly. Questions? WhatsApp us on +" + esc(C.WHATSAPP) + ".");
+          });
+      })();
+    } else {
+      restorePending();
+      fetch(C.API_URL + "?action=cancel&ref=" + encodeURIComponent(cancelled) + "&token=" + encodeURIComponent(q.get("t") || ""))
+        .catch(function () {})
+        .then(function () { S.loaded = false; goStep(2); stepError(2, "Payment cancelled, so nothing was charged. Pick a date to try again."); scrollToBook(); });
+    }
+    return true;
+  }
+
   $("#newBooking").addEventListener("click", function () {
-    $("#wizard").reset(); S.addons = {}; S.date = null; S.slot = null;
+    $("#wizard").reset(); S.addons = {}; S.date = null; S.slot = null; S.submitting = false;
     renderAddons(); renderSummary(); goStep(1);
   });
 
   /* ---------- start ---------- */
   renderSizes(); renderQuote(); renderPrices(); renderPkgSelect(); renderAddons(); renderSummary(); renderCalendar();
-  loadAvailability();
+  if (!(C.API_URL && handleReturn())) loadAvailability();
 })();
