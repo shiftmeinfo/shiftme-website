@@ -236,9 +236,9 @@
     var d = parseYmd(ds);
     if (d < minDate || d > maxDate) return "off";
     if (C.CLOSED_WEEKDAYS.indexOf(d.getDay()) > -1 || S.avail.blocked.indexOf(ds) > -1) return "closed";
-    var n = dayInfo(ds).count;
-    if (n >= C.MAX_BOOKINGS_PER_DAY) return "full";
-    if (n > 0 && n === C.MAX_BOOKINGS_PER_DAY - 1) return "one";
+    var n = dayInfo(ds).count, cap = Math.min(C.MAX_BOOKINGS_PER_DAY, daySlots(ds).length);
+    if (n >= cap || !freeSlots(ds).length) return "full";
+    if (n > 0 && cap - n === 1) return "one";
     return "free";
   }
 
@@ -270,9 +270,13 @@
   $("#calPrev").addEventListener("click", function () { S.month = new Date(S.month.getFullYear(), S.month.getMonth() - 1, 1); renderCalendar(); });
   $("#calNext").addEventListener("click", function () { S.month = new Date(S.month.getFullYear(), S.month.getMonth() + 1, 1); renderCalendar(); });
 
+  function daySlots(ds) {
+    var wd = parseYmd(ds).getDay();
+    return C.SLOTS.filter(function (s) { return !s.days || s.days.indexOf(wd) > -1; });
+  }
   function freeSlots(ds) {
     var taken = dayInfo(ds).slots || [];
-    return C.SLOTS.filter(function (s) { return taken.indexOf(s.id) === -1; });
+    return daySlots(ds).filter(function (s) { return taken.indexOf(s.id) === -1; });
   }
   function pickDate(ds) {
     S.date = ds;
@@ -286,7 +290,7 @@
     $("#slots").hidden = false;
     $("#slotDate").textContent = prettyDate(S.date);
     var free = freeSlots(S.date).map(function (s) { return s.id; });
-    $("#slotRow").innerHTML = C.SLOTS.map(function (s) {
+    $("#slotRow").innerHTML = daySlots(S.date).map(function (s) {
       var ok = free.indexOf(s.id) > -1;
       return '<button type="button" class="slot" data-slot="' + s.id + '" aria-pressed="' + (S.slot === s.id) + '"' + (ok ? "" : " disabled") + "><b>" + s.label + "</b><span>" + (ok ? s.time : "Taken") + "</span></button>";
     }).join("");

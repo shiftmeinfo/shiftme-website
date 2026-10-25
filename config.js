@@ -17,9 +17,10 @@ window.SHIFTME_CONFIG = {
   CLOSED_WEEKDAYS: [],         // e.g. [0] closes Sundays. 0 Sun, 1 Mon ... 6 Sat
 
   // Arrival slots. Each slot can be taken once per day.
+  // "days" lists the weekdays a slot is offered: 0 Sun, 1 Mon ... 6 Sat. Leave it out to offer it every day.
   SLOTS: [
     { id: "morning",   label: "Morning",   time: "9am start" },
-    { id: "afternoon", label: "Afternoon", time: "1pm start" }
+    { id: "afternoon", label: "Afternoon", time: "1pm start", days: [1, 2, 3, 4, 5, 6] }   // not Sundays (we close at 1pm)
   ],
 
   // Contact details
@@ -28,7 +29,7 @@ window.SHIFTME_CONFIG = {
   WHATSAPP: "447457411586",
   EMAIL: "shiftmeinfo@gmail.com",
   INSTAGRAM: "shiftmeuk",
-  HOURS: "7 days a week, 9am to 5pm",
+  HOURS: "Monday to Saturday 9am to 5:30pm, Sunday 9am to 1pm",
 
   // Packages. Change a price here and it updates everywhere on the site.
   PACKAGES: [

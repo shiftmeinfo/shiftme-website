@@ -284,6 +284,8 @@ function priceBooking(cfg, d) {
   if (!pkg) return { error: "Please choose a move package." };
   var slot = (cfg.SLOTS || []).filter(function (s) { return s.id === d.slot; })[0];
   if (!slot) return { error: "Please pick a morning or afternoon arrival." };
+  var dp = String(d.date || "").split("-"), wd = new Date(+dp[0], +dp[1] - 1, +dp[2]).getDay();
+  if (slot.days && slot.days.indexOf(wd) === -1) return { error: "That arrival time isn't available on that day. Please pick another time." };
   var extras = [], total = pkg.price;
   (d.extras || []).forEach(function (x) {
     var a = (cfg.ADDONS || []).filter(function (y) { return y.id === x.id; })[0];
