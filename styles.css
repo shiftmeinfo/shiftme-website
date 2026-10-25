@@ -56,7 +56,8 @@ p{margin:0 0 1em}
 .site-header{position:sticky;top:0;z-index:50;background:rgba(13,27,42,.96);backdrop-filter:blur(8px);color:#fff}
 .header-row{display:flex;align-items:center;gap:24px;height:68px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:1.3rem;letter-spacing:-.02em}
-.logo svg{width:40px}
+.logo img{height:44px;width:auto}
+@media (max-width:420px){.logo img{height:36px}}
 .nav{display:flex;gap:26px;margin-left:auto}
 .nav a{text-decoration:none;font-size:.95rem;color:#C9D2DC}
 .nav a:hover{color:#fff}
