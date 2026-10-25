@@ -75,7 +75,7 @@ function setup() {
   ScriptApp.newTrigger("reconcile").timeBased().everyMinutes(5).create();
 
   var sk = PropertiesService.getScriptProperties().getProperty("STRIPE_SECRET_KEY");
-  Logger.log(sk ? "Setup done. Stripe key found (" + (sk.indexOf("sk_live") === 0 ? "LIVE mode" : "TEST mode") + ")."
+  Logger.log(sk ? "Setup done. Stripe key found (" + (sk.indexOf("_live_") > -1 ? "LIVE mode" : "TEST mode") + ")."
                  : "Setup done. Now add STRIPE_SECRET_KEY in Project Settings > Script properties.");
 }
 
