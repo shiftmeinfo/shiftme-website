@@ -72,6 +72,8 @@ p{margin:0 0 1em}
 .ticks{list-style:none;padding:0;margin:24px 0 28px;display:grid;gap:10px}
 .ticks li{padding-left:30px;position:relative;color:#E5EAF0}
 .ticks li::before{content:"";position:absolute;left:0;top:.45em;width:18px;height:18px;border-radius:50%;background:var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' stroke='%230D1B2A' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+.ticks li.tick-note{color:#C9D2DC;font-size:.92rem}
+.ticks li.tick-note::before{background:rgba(255,255,255,.14) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='4.5' r='1.2' fill='%23fff'/%3E%3Cpath d='M8 7.5v4.5' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/14px no-repeat}
 .hero-contact{display:flex;gap:10px;flex-wrap:wrap}
 .chip-link{border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 16px;text-decoration:none;font-size:.92rem}
 .chip-link:hover{border-color:var(--green);color:var(--green)}
