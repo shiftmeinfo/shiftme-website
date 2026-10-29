@@ -90,7 +90,7 @@
     var p = PK[S.pkg];
     $$("#qSizes button").forEach(function (b) { b.setAttribute("aria-checked", b.dataset.id === S.pkg ? "true" : "false"); });
     countTo($("#qPrice"), shownPrice, p.price); shownPrice = p.price;
-    $("#qName").textContent = p.name;
+    $("#qName").textContent = p.name.replace(/^Small move/, "Call out");
     $("#qItems").innerHTML = p.items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("");
     loadVan(p.load);
   }
