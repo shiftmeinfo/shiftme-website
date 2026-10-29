@@ -8,7 +8,7 @@
 
   var PK = {}; C.PACKAGES.forEach(function (p) { PK[p.id] = p; });
   var AD = {}; C.ADDONS.forEach(function (a) { AD[a.id] = a; });
-  var GROUP_LABEL = { flat: "Flats", house: "Houses", small: "Small moves" };
+  var GROUP_LABEL = { flat: "Flats", house: "Houses", small: "Call outs" };
 
   var S = {
     pkg: "f1", addons: {}, date: null, slot: null, step: 1,
@@ -90,7 +90,7 @@
     var p = PK[S.pkg];
     $$("#qSizes button").forEach(function (b) { b.setAttribute("aria-checked", b.dataset.id === S.pkg ? "true" : "false"); });
     countTo($("#qPrice"), shownPrice, p.price); shownPrice = p.price;
-    $("#qName").textContent = p.name.replace(/^Small move/, "Call out");
+    $("#qName").textContent = p.name;
     $("#qItems").innerHTML = p.items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("");
     loadVan(p.load);
   }
@@ -142,7 +142,7 @@
       return '<div class="pkg-group"><p>' + GROUP_LABEL[g] + '</p><div class="pkg-options">' +
         C.PACKAGES.filter(function (p) { return p.group === g; }).map(function (p) {
           return '<div class="pkg-opt"><input type="radio" name="pkg" id="pk_' + p.id + '" value="' + p.id + '"' + (p.id === S.pkg ? " checked" : "") + '>' +
-            '<label for="pk_' + p.id + '"><b>' + esc(p.name.replace(/^Small move, /, "")) + "</b><span>" + money(p.price) + "</span></label></div>";
+            '<label for="pk_' + p.id + '"><b>' + esc(p.name.replace(/^Call out, /, "")) + "</b><span>" + money(p.price) + "</span></label></div>";
         }).join("") + "</div></div>";
     }).join("");
     $$("#pkgSelect input").forEach(function (i) { i.addEventListener("change", function () { choosePkg(i.value); }); });

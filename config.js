@@ -57,9 +57,9 @@ window.SHIFTME_CONFIG = {
     { id: "h4", group: "house", size: 4, name: "4 bedroom house", price: 950, load: 10,
       items: ["King size bed and 3 double beds with mattresses", "5 bedside tables", "2 double wardrobes and 2 wardrobes", "Chest of drawers", "Kitchen table and 6 chairs", "Washing machine", "Fridge freezer", "Microwave", "Coffee table", "TV and stand", "3 seater sofa", "Armchair", "Up to 35 large and 15 medium boxes", "4 suitcases"] },
 
-    { id: "s1", group: "small", size: 1, name: "Small move, 1 mover",  price: 83,  load: 1,
+    { id: "s1", group: "small", size: 1, name: "Call out, 1 mover",  price: 83,  load: 1,
       items: ["A few items or a single piece of furniture", "One mover and the van", "Call out charge, final price confirmed before the day"] },
-    { id: "s2", group: "small", size: 2, name: "Small move, 2 movers", price: 124.5, load: 2,
+    { id: "s2", group: "small", size: 2, name: "Call out, 2 movers", price: 124.5, load: 2,
       items: ["Heavier or bulky items like sofas and fridges", "Two movers and the van", "Call out charge, final price confirmed before the day"] }
   ],
 
