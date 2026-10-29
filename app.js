@@ -130,38 +130,11 @@
   });
   $("#qBook").addEventListener("click", function () { goStep(2); scrollToBook(); });
 
-  /* ---------- price list ---------- */
-  var pGroup = "flat";
-  function renderPrices() {
-    var list = C.PACKAGES.filter(function (p) { return p.group === pGroup; });
-    $("#priceGrid").innerHTML = list.map(function (p) {
-      var show = p.items.slice(0, 6), rest = p.items.length - show.length;
-      return '<article class="p-card"><h3>' + esc(p.name) + '</h3>' +
-        '<p class="p-price">' + money(p.price) + (p.group === "small" ? " <small>from</small>" : "") + "</p>" +
-        '<p class="muted" style="margin:0;font-size:.85rem">Paid in full when you book</p>' +
-        '<ul data-all="' + esc(JSON.stringify(p.items)) + '">' + show.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>" +
-        (rest > 0 ? '<button class="more" type="button">Show all ' + p.items.length + " items</button>" : "") +
-        '<button class="btn btn-navy btn-block" type="button" data-book="' + p.id + '">Book this move</button></article>';
-    }).join("");
-    $$("#priceGrid .more").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var ul = b.previousElementSibling, all = JSON.parse(ul.dataset.all);
-        ul.innerHTML = all.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join(""); b.remove();
-      });
-    });
-    $$("#priceGrid [data-book]").forEach(function (b) {
-      b.addEventListener("click", function () { choosePkg(b.dataset.book); goStep(2); scrollToBook(); });
-    });
-  }
-  wireSeg($("#pGroup"), function (g) { pGroup = g; renderPrices(); });
-
   function priceUnit(a) {
     if (a.per === "hour") return money(a.price) + " an hour";
     if (a.per === "item") return money(a.price) + " each";
     return money(a.price);
   }
-  $("#extrasList").innerHTML = C.ADDONS.concat(C.OTHER_CHARGES.map(function (o) { return { name: o.name, note: o.note, price: o.price, per: "once" }; }))
-    .map(function (a) { return '<div class="x-row"><div>' + esc(a.name) + "<span>" + esc(a.note) + "</span></div><b>" + priceUnit(a) + "</b></div>"; }).join("");
 
   /* ---------- step 1: package + extras ---------- */
   function renderPkgSelect() {
@@ -569,6 +542,6 @@
     fillSizes(); sizeSel.value = "f2"; showExample();
   })();
 
-  renderSizes(); renderQuote(); renderPrices(); renderPkgSelect(); renderAddons(); renderSummary(); renderCalendar();
+  renderSizes(); renderQuote(); renderPkgSelect(); renderAddons(); renderSummary(); renderCalendar();
   if (!(C.API_URL && handleReturn())) loadAvailability();
 })();
