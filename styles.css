@@ -325,3 +325,41 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);bo
 .page h1{font-size:clamp(2rem,5vw,3rem);margin-bottom:24px}
 .page h2{font-size:1.3rem;margin-top:32px}
 .page p,.page li{color:#374151;max-width:68ch}
+
+/* Quick quote */
+.qq{background:#fff}
+.qq-grid{display:grid;grid-template-columns:1.1fr 1fr;border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line)}
+@media (max-width:860px){.qq-grid{grid-template-columns:1fr}}
+.qq-form{padding:32px;display:grid;gap:20px;min-width:0;background:#fff}
+.qq-field{display:grid;gap:6px;min-width:0}
+.qq-lbl{font-size:.88rem;font-weight:600}
+.qq-seg{margin:0;max-width:none}
+.qq-form select,.qq-form input{font:inherit;color:var(--navy);background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-width:0}
+.qq-form select:focus,.qq-form input:focus{border-color:var(--green);outline:none}
+.qq-pc{text-transform:uppercase;letter-spacing:.04em}
+.qq-pc::placeholder{text-transform:none;letter-spacing:0;color:#9AA3AF}
+.qq-pcs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.qq-pin{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--navy);margin-right:6px;vertical-align:1px}
+.qq-pin-to{background:var(--green)}
+.qq-err{color:var(--red);font-size:.86rem;margin:0;min-height:1.2em}
+.qq-result{background:var(--navy);color:#fff;padding:32px;display:grid;gap:22px;align-content:start;min-width:0}
+.qq-rtitle{font-size:.8rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#B9C3CF;margin:0}
+.qq-route{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.qq-stop{display:grid;gap:2px;font-size:.78rem;color:#B9C3CF}
+.qq-stop b{font-size:1.05rem;color:#fff;letter-spacing:.03em}
+.qq-end{text-align:right}
+.qq-track{position:relative;height:30px}
+.qq-track::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px dashed rgba(255,255,255,.28)}
+.qq-miles{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font-size:.75rem;color:#B9C3CF;white-space:nowrap}
+.qq-track svg{position:absolute;top:8px;left:0;width:30px;height:16px;fill:var(--green);transition:left .9s cubic-bezier(.2,.8,.2,1)}
+.qq-track.go svg{left:calc(100% - 30px)}
+.qq-lines{display:grid;gap:10px;margin:0;padding:18px 0 0;list-style:none;border-top:1px solid rgba(255,255,255,.12)}
+.qq-lines li{display:flex;justify-content:space-between;gap:16px;font-size:.93rem}
+.qq-lines li span:first-child{color:#B9C3CF;min-width:0}
+.qq-lines li span:last-child{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.qq-free{color:var(--green)}
+.qq-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:18px}
+.qq-total span{color:#B9C3CF;font-size:.9rem}
+.qq-total strong{font-size:2.6rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.qq-note{font-size:.8rem;color:#B9C3CF;margin:0}
+@media (max-width:480px){.qq-form,.qq-result{padding:22px}.qq-pcs{grid-template-columns:1fr}.qq-total strong{font-size:2.2rem}}

@@ -23,6 +23,14 @@ window.SHIFTME_CONFIG = {
     { id: "afternoon", label: "Afternoon", time: "1pm start", days: [1, 2, 3, 4, 5, 6] }   // not Sundays (we close at 1pm)
   ],
 
+  // Quick quote mileage. Charged on the full round trip (London to pickup, pickup to drop off,
+  // drop off back to London) when either address is outside London. London to London moves are free.
+  MILEAGE: {
+    PER_MILE: 0.30,      // £ per mile
+    ROAD_FACTOR: 1.2,    // straight line distance x this = estimated road miles
+    LONDON: { lat: 51.5074, lon: -0.1278 }   // Charing Cross, where mileage is counted from
+  },
+
   // Contact details
   PHONE_DISPLAY: "020 3488 8610",
   PHONE_LINK: "+442034888610",

@@ -481,6 +481,94 @@
   });
 
   /* ---------- start ---------- */
+  /* ---------- quick quote: postcode to postcode price ---------- */
+  (function quickQuote() {
+    var M = C.MILEAGE || { PER_MILE: 0.3, ROAD_FACTOR: 1.2, LONDON: { lat: 51.5074, lon: -0.1278 } };
+    var LONDON_AREAS = ["E", "EC", "N", "NW", "SE", "SW", "W", "WC", "BR", "CR", "DA", "EN", "HA", "IG", "KT", "RM", "SM", "TW", "UB"];
+    // Postcode area centres, only used if the postcode lookup service is unreachable
+    var AREAS = {AB:[57.15,-2.15],AL:[51.76,-0.33],B:[52.48,-1.89],BA:[51.33,-2.45],BB:[53.75,-2.4],BD:[53.8,-1.8],BH:[50.74,-1.9],BL:[53.58,-2.43],BN:[50.85,-0.15],BR:[51.39,0.03],BS:[51.46,-2.59],BT:[54.6,-5.93],CA:[54.85,-3],CB:[52.2,0.13],CF:[51.5,-3.2],CH:[53.2,-2.95],CM:[51.75,0.4],CO:[51.88,0.85],CR:[51.37,-0.1],CT:[51.28,1.1],CV:[52.4,-1.5],CW:[53.1,-2.45],DA:[51.44,0.2],DD:[56.47,-2.97],DE:[52.92,-1.48],DG:[55.07,-3.6],DH:[54.8,-1.6],DL:[54.5,-1.6],DN:[53.55,-1],DT:[50.7,-2.45],DY:[52.48,-2.1],E:[51.53,-0.03],EC:[51.52,-0.09],EH:[55.94,-3.2],EN:[51.66,-0.08],EX:[50.72,-3.53],FK:[56,-3.8],FY:[53.82,-3.03],G:[55.86,-4.25],GL:[51.86,-2.24],GU:[51.24,-0.7],HA:[51.58,-0.34],HD:[53.64,-1.78],HG:[54,-1.54],HP:[51.75,-0.7],HR:[52.06,-2.72],HS:[58.2,-6.38],HU:[53.75,-0.35],HX:[53.72,-1.86],IG:[51.57,0.07],IP:[52.06,1.15],IV:[57.48,-4.22],KA:[55.6,-4.5],KT:[51.38,-0.3],KW:[58.6,-3.5],KY:[56.15,-3.15],L:[53.41,-2.98],LA:[54.05,-2.8],LD:[52.24,-3.38],LE:[52.63,-1.13],LL:[53.12,-3.8],LN:[53.23,-0.54],LS:[53.8,-1.55],LU:[51.88,-0.42],M:[53.48,-2.24],ME:[51.33,0.55],MK:[52.04,-0.76],ML:[55.78,-3.98],N:[51.57,-0.11],NE:[54.97,-1.61],NG:[52.95,-1.15],NN:[52.24,-0.89],NP:[51.58,-3],NR:[52.63,1.3],NW:[51.55,-0.18],OL:[53.54,-2.12],OX:[51.75,-1.26],PA:[55.85,-4.6],PE:[52.57,-0.24],PH:[56.4,-3.45],PL:[50.38,-4.14],PO:[50.82,-1.08],PR:[53.76,-2.7],RG:[51.45,-0.98],RH:[51.2,-0.2],RM:[51.56,0.2],S:[53.38,-1.47],SA:[51.62,-3.94],SE:[51.47,-0.06],SG:[51.9,-0.2],SK:[53.4,-2.15],SL:[51.51,-0.6],SM:[51.36,-0.19],SN:[51.56,-1.78],SO:[50.91,-1.4],SP:[51.07,-1.8],SR:[54.9,-1.38],SS:[51.55,0.7],ST:[53,-2.18],SW:[51.46,-0.17],SY:[52.71,-2.75],TA:[51.02,-3.1],TD:[55.6,-2.4],TF:[52.68,-2.45],TN:[51.13,0.26],TQ:[50.46,-3.53],TR:[50.26,-5.05],TS:[54.57,-1.23],TW:[51.45,-0.37],UB:[51.53,-0.42],W:[51.51,-0.2],WA:[53.39,-2.59],WC:[51.52,-0.12],WD:[51.66,-0.4],WF:[53.68,-1.5],WN:[53.55,-2.63],WR:[52.19,-2.22],WS:[52.58,-1.98],WV:[52.59,-2.13],YO:[53.96,-1.08],ZE:[60.15,-1.15]};
+    var group = "flat", sizeSel = $("#qqSize"), lastPkg = "f2";
+
+    function fillSizes() {
+      sizeSel.innerHTML = C.PACKAGES.filter(function (p) { return p.group === group; }).map(function (p) {
+        return '<option value="' + p.id + '">' + esc(p.name) + " (" + (p.group === "small" ? "from " : "") + money(p.price) + ")</option>";
+      }).join("");
+    }
+    $$("#qqType button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        $$("#qqType button").forEach(function (x) { x.setAttribute("aria-selected", x === b ? "true" : "false"); });
+        group = b.dataset.group; fillSizes(); run();
+      });
+    });
+    sizeSel.addEventListener("change", run);
+
+    function clean(pc) { return String(pc).toUpperCase().replace(/\s+/g, ""); }
+    function valid(pc) { return /^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$/.test(clean(pc)); }
+    function outward(pc) { var c = clean(pc); return c.slice(0, c.length - 3); }
+    function pretty(pc) { var c = clean(pc); return outward(c) + " " + c.slice(-3); }
+    function area(pc) { return clean(pc).match(/^[A-Z]{1,2}/)[0]; }
+    function miles(a, b) {
+      var R = 3958.8, t = Math.PI / 180, dLat = (b.lat - a.lat) * t, dLon = (b.lon - a.lon) * t;
+      var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return 2 * R * Math.asin(Math.sqrt(h)) * M.ROAD_FACTOR;
+    }
+    function locate(pc) {
+      function fallback() { var a = AREAS[area(pc)]; return a ? { lat: a[0], lon: a[1], london: LONDON_AREAS.indexOf(area(pc)) > -1 } : null; }
+      return fetch("https://api.postcodes.io/postcodes/" + encodeURIComponent(clean(pc)))
+        .then(function (r) { return r.status === 404 ? null : (r.ok ? r.json() : Promise.reject()); })
+        .then(function (j) { if (!j) return null; var x = j.result; return { lat: x.latitude, lon: x.longitude, london: x.region === "London" }; })
+        .catch(fallback);
+    }
+
+    function render(from, to, a, b, isExample) {
+      var p = PK[sizeSel.value], trip = miles(a, b);
+      var outside = !a.london || !b.london;
+      var round = outside ? Math.round(miles(M.LONDON, a) + trip + miles(b, M.LONDON)) : 0;
+      var mileCost = round * M.PER_MILE, small = p.group === "small";
+      lastPkg = p.id;
+      $("#qqRFrom").textContent = outward(from); $("#qqRTo").textContent = outward(to);
+      $("#qqMiles").textContent = "about " + Math.max(1, Math.round(trip)) + " miles";
+      $("#qqLines").innerHTML =
+        "<li><span>" + esc(p.name) + "</span><span>" + (small ? "from " : "") + money(p.price) + "</span></li>" +
+        (outside
+          ? "<li><span>Round trip mileage from London (" + round + " miles at " + Math.round(M.PER_MILE * 100) + "p)</span><span>" + money(mileCost) + "</span></li>"
+          : '<li><span>Mileage</span><span class="qq-free">Included, London move</span></li>');
+      $("#qqTotalLbl").textContent = isExample ? "Example quote" : (small ? "Estimated total from" : "Estimated total");
+      $("#qqTotal").textContent = money(p.price + mileCost);
+      var tr = $("#qqTrack"); tr.classList.remove("go"); void tr.offsetWidth; tr.classList.add("go");
+    }
+
+    function run(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      var from = $("#qqFrom").value, to = $("#qqTo").value, err = $("#qqErr");
+      if (!from && !to && !e) return showExample();
+      if (!valid(from) || !valid(to)) { err.textContent = "Please enter a full UK postcode for both addresses, for example SE1 7PB."; return; }
+      err.textContent = "";
+      $("#qqGo").textContent = "Working it out..."; $("#qqGo").disabled = true;
+      Promise.all([locate(from), locate(to)]).then(function (r) {
+        $("#qqGo").textContent = "Get my quote"; $("#qqGo").disabled = false;
+        if (!r[0] || !r[1]) { err.textContent = "We couldn't find " + pretty(!r[0] ? from : to) + ". Check the postcode and try again."; return; }
+        render(from, to, r[0], r[1], false);
+      });
+    }
+    // Opens on a worked example (SE1 to Luton) so visitors can see how it works
+    function showExample() {
+      render("SE17PB", "LU12HN", { lat: 51.5011, lon: -0.1093, london: true }, { lat: 51.8787, lon: -0.4200, london: false }, true);
+    }
+    $("#qqForm").addEventListener("submit", run);
+    ["#qqFrom", "#qqTo"].forEach(function (s) { $(s).addEventListener("keydown", function (e) { if (e.key === "Enter") run(e); }); });
+
+    $("#qqBook").addEventListener("click", function () {
+      choosePkg(lastPkg);
+      var f = $('#book input[name="from"]'), t = $('#book input[name="to"]');
+      if (f && !f.value && valid($("#qqFrom").value)) f.value = pretty($("#qqFrom").value);
+      if (t && !t.value && valid($("#qqTo").value)) t.value = pretty($("#qqTo").value);
+      goStep(2); scrollToBook();
+    });
+
+    fillSizes(); sizeSel.value = "f2"; showExample();
+  })();
+
   renderSizes(); renderQuote(); renderPrices(); renderPkgSelect(); renderAddons(); renderSummary(); renderCalendar();
   if (!(C.API_URL && handleReturn())) loadAvailability();
 })();
