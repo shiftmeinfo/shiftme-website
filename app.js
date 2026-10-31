@@ -71,12 +71,13 @@
   function setSeg(el, group) { $$("button", el).forEach(function (x) { x.setAttribute("aria-selected", x.dataset.group === group ? "true" : "false"); }); }
 
   /* ---------- hero quote ---------- */
-  var qGroup = "flat", shownPrice = 0, shownLoad = 0;
+  var qGroup = "flat", shownPrice = 0, shownLoad = 0, HQ = !!document.getElementById("qSizes");
   function sizeLabel(p) {
     if (p.group === "small") return p.size + (p.size > 1 ? " movers" : " mover");
     return p.size + " bed";
   }
   function renderSizes() {
+    if (!HQ) return;
     var list = C.PACKAGES.filter(function (p) { return p.group === qGroup; });
     if (PK[S.pkg].group !== qGroup) S.pkg = list[0].id;
     $("#qSizes").innerHTML = list.map(function (p) {
@@ -87,6 +88,7 @@
     });
   }
   function renderQuote() {
+    if (!HQ) return;
     var p = PK[S.pkg];
     $$("#qSizes button").forEach(function (b) { b.setAttribute("aria-checked", b.dataset.id === S.pkg ? "true" : "false"); });
     countTo($("#qPrice"), shownPrice, p.price); shownPrice = p.price;
@@ -122,13 +124,31 @@
     if (n !== shownLoad) { var v = $(".van"); v.classList.remove("bump"); void v.getBoundingClientRect(); v.classList.add("bump"); }
     shownLoad = count;
   }
-  wireSeg($("#qGroup"), function (g) { qGroup = g; renderSizes(); renderQuote(); syncAll(); });
-  $("#qIncluded").addEventListener("click", function () {
+  if (HQ) wireSeg($("#qGroup"), function (g) { qGroup = g; renderSizes(); renderQuote(); syncAll(); });
+  if (HQ) $("#qIncluded").addEventListener("click", function () {
     var open = $("#qItems").hidden;
     $("#qItems").hidden = !open; this.setAttribute("aria-expanded", open ? "true" : "false");
     this.textContent = open ? "Hide what's included" : "What's included";
   });
-  $("#qBook").addEventListener("click", function () { goStep(2); scrollToBook(); });
+  if (HQ) $("#qBook").addEventListener("click", function () { goStep(2); scrollToBook(); });
+
+  /* ---------- package cards (prices come from config.js) ---------- */
+  (function packageCards() {
+    var box = document.getElementById("pkCards"); if (!box) return;
+    var houses = C.PACKAGES.filter(function (p) { return p.group === "house"; });
+    var list = C.PACKAGES.filter(function (p) { return p.id === "s1"; }).concat(C.PACKAGES.filter(function (p) { return p.group === "flat"; }));
+    var cards = list.map(function (p) {
+      return { id: p.id, name: p.group === "small" ? "Small move" : p.name, price: (p.group === "small" ? "from " : "") + money(p.price),
+        desc: p.group === "small" ? "A few items or one big piece. Ideal for Marketplace buys and flat pack collections." : p.items.slice(0, 3).map(function (x, i) { return i ? x.charAt(0).toLowerCase() + x.slice(1) : x; }).join(", ") + " and more." };
+    });
+    if (houses.length) cards.push({ id: houses[0].id, name: "Houses", price: "from " + money(houses[0].price),
+      desc: "1 to " + houses[houses.length - 1].size + " bedrooms, washing machine and fridge freezer included." });
+    box.innerHTML = cards.map(function (c) {
+      return '<article class="pk-card"><h3>' + esc(c.name) + '</h3><p>' + esc(c.desc) + '</p><p class="pk-price">' + esc(c.price) +
+        '</p><button type="button" class="btn btn-navy btn-block" data-pk="' + c.id + '">Book this</button></article>';
+    }).join("");
+    $$("#pkCards [data-pk]").forEach(function (b) { b.addEventListener("click", function () { choosePkg(b.dataset.pk); goStep(1); scrollToBook(); }); });
+  })();
 
   function priceUnit(a) {
     if (a.per === "hour") return money(a.price) + " an hour";
@@ -169,7 +189,7 @@
   function choosePkg(id) {
     S.pkg = id;
     var g = PK[id].group;
-    if (g !== qGroup) { qGroup = g; setSeg($("#qGroup"), g); renderSizes(); }
+    if (g !== qGroup) { qGroup = g; if (HQ) setSeg($("#qGroup"), g); renderSizes(); }
     var r = document.getElementById("pk_" + id); if (r) r.checked = true;
     renderQuote(); renderSummary();
   }
