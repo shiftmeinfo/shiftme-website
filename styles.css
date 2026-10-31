@@ -363,3 +363,27 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);bo
 .qq-total strong{font-size:2.6rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
 .qq-note{font-size:.8rem;color:#B9C3CF;margin:0}
 @media (max-width:480px){.qq-form,.qq-result{padding:22px}.qq-pcs{grid-template-columns:1fr}.qq-total strong{font-size:2.2rem}}
+
+/* Oct 2026 refresh: hero anchors, comparison strip, business band */
+.h1-green{color:var(--green)}
+.price-anchors{display:flex;flex-wrap:wrap;gap:10px;margin:4px 0 0}
+.price-anchors span{background:rgba(255,255,255,.08);color:#E5EAF0;padding:8px 14px;border-radius:10px;font-size:.95rem}
+.price-anchors b{color:#fff}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.compare{background:var(--light);padding:48px 0}
+.compare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.cmp{background:#fff;border-radius:var(--radius);padding:26px}
+.cmp h3{font-size:1.25rem;font-weight:700}
+.cmp p:last-child{color:#4B5563;margin:0}
+.cmp-k{font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--grey);margin-bottom:8px}
+.cmp-us{background:var(--navy);color:#fff}
+.cmp-us .cmp-k{color:#4ADE80}
+.cmp-us p:last-child{color:#CBD5E1}
+@media (max-width:860px){.compare-grid{grid-template-columns:1fr}}
+.biz{background:var(--navy);color:#fff;padding:56px 0;margin-top:56px}
+.biz-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:28px}
+.biz-row>div{flex:1 1 520px;min-width:0}
+.biz-row p{color:#CBD5E1;margin:0}
+.biz-row h2{color:#fff}
+.biz-k{font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4ADE80!important;margin-bottom:8px!important}
+.hero h1{font-size:clamp(2.3rem,4.4vw,3.5rem)}
