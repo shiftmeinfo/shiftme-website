@@ -422,7 +422,7 @@
     var a = findPostcode(v.from), b = findPostcode(v.to);
     if (!GEO) { renderSummary(); return done(); }
     Promise.all([GEO.locate(a), GEO.locate(b)]).then(function (r) {
-      if (!r[0] || !r[1]) var bad = !r[0] ? a : b; return done("We couldn't find the postcode " + bad.slice(0, -3) + " " + bad.slice(-3) + ". Please check it and try again.");
+      if (!r[0] || !r[1]) { var bad = !r[0] ? a : b; return done("We couldn't find the postcode " + bad.slice(0, -3) + " " + bad.slice(-3) + ". Please check it and try again."); }
       if (!r[0].london || !r[1].london) {
         var M = GEO.M, n = Math.round(GEO.miles(M.LONDON, r[0]) + GEO.miles(r[0], r[1]) + GEO.miles(r[1], M.LONDON));
         S.miles = n;
