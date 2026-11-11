@@ -428,3 +428,4 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);bo
 .callout-ok{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--light, #F2F4F7)}
 #step1Error{margin-top:10px}
 .callout-ok[hidden]{display:none}
+.heavy-note{margin-top:14px;font-size:.85rem}

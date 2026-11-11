@@ -30,6 +30,11 @@ window.SHIFTME_CONFIG = {
     ROAD_FACTOR: 1.2,    // straight line distance x this = estimated road miles
     LONDON: { lat: 51.5074, lon: -0.1278 }   // Charing Cross, where mileage is counted from
   },
+  // Mileage is worked out from the customer's postcodes and added to the booking total automatically,
+  // using the miles100 / miles10 / miles1 add ons below. If you change PER_MILE, change their prices too.
+
+  // Stairs with no lift: the 1st floor is included, then PER_FLOOR for each floor above it, at each address.
+  STAIRS: { FREE_FLOORS: 1, PER_FLOOR: 20 },
 
   // Call out limits. Shown on the site and in the box customers tick when booking a call out.
   CALL_OUT: { MAX_ITEMS: "5 items or 10 boxes", MAX_HOURS: 2, EXTRA_HOUR: 45 },
@@ -61,9 +66,9 @@ window.SHIFTME_CONFIG = {
       items: ["King size bed and 3 double beds with mattresses", "5 bedside tables", "2 double wardrobes and 2 wardrobes", "Chest of drawers", "Kitchen table and 6 chairs", "Washing machine", "Fridge freezer", "Microwave", "Coffee table", "TV and stand", "3 seater sofa", "Armchair", "Up to 35 large and 15 medium boxes", "4 suitcases"] },
 
     { id: "s1", group: "small", size: 1, name: "Call out, 1 mover",  price: 83,  load: 1,
-      items: ["Up to 5 items or 10 boxes", "One mover and the van for up to 2 hours", "Extra time is £45 an hour, billed before your move"] },
+      items: ["Up to 5 items or 10 boxes", "One mover and the van for up to 2 hours", "Extra time is £45 an hour, add it when you book"] },
     { id: "s2", group: "small", size: 2, name: "Call out, 2 movers", price: 124.5, load: 2,
-      items: ["Up to 5 items or 10 boxes, including bulky ones like sofas and fridges", "Two movers and the van for up to 2 hours", "Extra time is £45 an hour, billed before your move"] }
+      items: ["Up to 5 items or 10 boxes, including bulky ones like sofas and fridges", "Two movers and the van for up to 2 hours", "Extra time is £45 an hour, add it when you book"] }
   ],
 
   // Add ons customers can pick when booking.
@@ -106,6 +111,13 @@ window.SHIFTME_CONFIG = {
     { id: "table",      name: "Dining table",                   price: 35, per: "item", note: "Dismantle and reassemble" },
     { id: "otherlarge", name: "Other large furniture",          price: 45, per: "item", note: "Dismantle and reassemble" },
     { id: "labour",     name: "Extra time",                     price: 45, per: "hour", min: 1, note: "£45 an hour. Book it now if your job may run over" },
+
+    // Added automatically from the customer's details (not shown in the extras list)
+    { id: "stairs",     name: "Stairs, no lift",                price: 20,  per: "item", auto: true, note: "Per floor above the 1st, at each address" },
+    { id: "miles100",   name: "Mileage, 100 miles",             price: 30,  per: "item", auto: true, note: "30p a mile" },
+    { id: "miles10",    name: "Mileage, 10 miles",              price: 3,   per: "item", auto: true, note: "30p a mile" },
+    { id: "miles1",     name: "Mileage, 1 mile",                price: 0.3, per: "item", auto: true, note: "30p a mile" },
+
     { id: "waiting",    name: "2 hours waiting time",           price: 70, per: "item", note: "If you need us to wait on the day" }
   ],
 

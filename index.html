@@ -113,7 +113,7 @@
             <ul class="qq-lines" id="qqLines"></ul>
             <div class="qq-total"><span id="qqTotalLbl">Example quote</span><strong id="qqTotal">£0</strong></div>
             <button class="btn btn-green btn-block" type="button" id="qqBook">Pick a date and book</button>
-            <p class="qq-note">This is an estimate. For moves that start or finish outside London, mileage is 30p per mile for the full round trip from London, to your pickup, on to your new place and back. We confirm the exact amount after you book and any mileage balance is due 2 days before your move.</p>
+            <p class="qq-note">For moves that start or finish outside London, mileage is 30p per mile for the full round trip from London, to your pickup, on to your new place and back. It's worked out from your postcodes and added to your total when you book, so you pay everything in one go.</p>
           </div>
         </div>
       </div>
@@ -177,6 +177,7 @@
               <div class="pkg-select" id="pkgSelect"></div>
               <h4 class="sub">Extras <span class="muted">(optional)</span></h4>
               <div class="addon-list" id="addonList"></div>
+              <p class="muted heavy-note">Moving a piano, American fridge freezer, safe, gym equipment, marble or stone furniture, or anything over 100kg? These are quote on request, so please <a href="#contact">message us</a> before you book.</p>
               <label class="agree callout-ok" id="calloutOk" hidden><input type="checkbox" name="calloutOk"><span id="calloutText"></span></label>
               <p class="form-error" id="step1Error" role="alert" hidden></p>
               <div class="panel-nav">
@@ -224,7 +225,8 @@
                 <label>Floor and access at pickup
                   <select name="fromAccess">
                     <option>Ground floor</option><option>1st floor, lift</option><option>1st floor, stairs</option>
-                    <option>2nd floor or higher, lift</option><option>2nd floor or higher, stairs</option>
+                    <option>2nd floor or higher, lift</option><option>2nd floor, stairs</option><option>3rd floor, stairs</option>
+                    <option>4th floor, stairs</option><option>5th floor or higher, stairs</option>
                   </select>
                 </label>
                 <label>Parking at pickup
@@ -236,7 +238,8 @@
                 <label>Floor and access at drop off
                   <select name="toAccess">
                     <option>Ground floor</option><option>1st floor, lift</option><option>1st floor, stairs</option>
-                    <option>2nd floor or higher, lift</option><option>2nd floor or higher, stairs</option>
+                    <option>2nd floor or higher, lift</option><option>2nd floor, stairs</option><option>3rd floor, stairs</option>
+                    <option>4th floor, stairs</option><option>5th floor or higher, stairs</option>
                   </select>
                 </label>
                 <label>Parking at drop off
@@ -247,6 +250,7 @@
                 <label class="span2">Anything we should know?<textarea name="notes" rows="3" placeholder="Large or fragile items, narrow stairs, key collection times"></textarea></label>
                 <label class="hp" aria-hidden="true">Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label>
               </div>
+              <p class="form-error" id="step3Error" role="alert" hidden></p>
               <div class="panel-nav">
                 <button type="button" class="btn btn-ghost" data-back>Back</button>
                 <button type="button" class="btn btn-navy" data-next>Next: check and confirm</button>
@@ -319,10 +323,13 @@
     <section class="faq" id="faq">
       <div class="wrap narrow">
         <h2>Questions people ask</h2>
-        <details><summary>What if I have more than the package lists?</summary><p>Pick the package closest to your move and tell us about the extra items in the notes. We'll confirm any difference before your move day, so there are no surprises.</p></details>
-        <details><summary>What counts as a call out?</summary><p>A call out is for small jobs of up to 5 items or 10 boxes, like a Marketplace buy or a few pieces of furniture. It includes up to 2 hours with the van and your movers. Extra time is £45 an hour, and we'll bill it before your move. If it turns out to be a bigger move, we'll switch you to the right flat or house package and let you know the difference before the day.</p></details>
+        <details><summary>What if I have more than the package lists?</summary><p>Pick the package that fits your move, or the next size up if you have extra, and add any extras when you book. You pay everything in one go when you book, and we don't start any work until payment is received.</p></details>
+        <details><summary>What counts as a call out?</summary><p>A call out is for small jobs of up to 5 items or 10 boxes, like a Marketplace buy or a few pieces of furniture. It includes up to 2 hours with the van and your movers. Extra time is £45 an hour, so add it when you book if your job might run over. If it turns out to be a bigger move, we'll switch you to the right flat or house package and the difference must be paid before we start.</p></details>
+        <details><summary>Do you charge for stairs?</summary><p>Ground and 1st floor moves are included. If there's no lift, it's £20 for each floor above the 1st, at each address. It's added to your total automatically when you book.</p></details>
+        <details><summary>Do I need to pay for parking?</summary><p>No. We cover paid parking near your addresses, like pay and display bays and car parks. If your street needs a permit or a bay suspension, please arrange it or tell us in your booking notes so we can plan ahead.</p></details>
+        <details><summary>Can you move a piano or other very heavy items?</summary><p>Yes, on request. Pianos, American fridge freezers, safes, gym equipment, hot tubs, marble or stone furniture and anything over 100kg are quote on request. Message us before you book and we'll give you a price.</p></details>
         <details><summary>How do I pay?</summary><p>You pay the full price online when you book, by card, Apple Pay or Google Pay. Payments are handled securely by Stripe, so we never see your card details. Your move is confirmed as soon as payment goes through.</p></details>
-        <details><summary>Do you charge extra for moves outside London?</summary><p>Yes. Removals that start or finish outside London have an extra labour charge of 30p per mile for the full round trip from London. Try our Quick quote to see an estimate. We'll let you know the exact amount after you book, and this remaining balance is due 2 days before your move.</p></details>
+        <details><summary>Do you charge extra for moves outside London?</summary><p>Yes. Removals that start or finish outside London have an extra labour charge of 30p per mile for the full round trip from London. Try our Quick quote to see the price. The mileage is worked out from your postcodes and added to your total when you book.</p></details>
         <details><summary>Can I cancel?</summary><p>Cancel 7 or more days before your move and we refund you in full. Cancel 3 to 6 days before and we refund half. Cancellations with less than 72 hours' notice, or no shows, are non refundable.</p></details>
         <details><summary>Can I change my date?</summary><p>Yes. You can move your booking once for free with at least 72 hours' notice, subject to availability. Just get in touch.</p></details>
         <details><summary>Why is a date crossed out?</summary><p>We run a set number of jobs a day so every move gets our full attention. Once a day is full it closes automatically. Message us on WhatsApp if you're flexible and we'll tell you the nearest free day.</p></details>

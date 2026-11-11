@@ -287,8 +287,10 @@ function priceBooking(cfg, d) {
   var dp = String(d.date || "").split("-"), wd = new Date(+dp[0], +dp[1] - 1, +dp[2]).getDay();
   if (slot.days && slot.days.indexOf(wd) === -1) return { error: "That arrival time isn't available on that day. Please pick another time." };
   var extras = [], total = pkg.price;
+  var auto = autoCharges(cfg, d);   // stairs and mileage, worked out here so the browser can't change them
   (d.extras || []).forEach(function (x) {
     var a = (cfg.ADDONS || []).filter(function (y) { return y.id === x.id; })[0];
+    if (a && a.auto) return;
     var qty = Math.floor(Number(x.qty) || 0);
     if (!a || qty <= 0) return;
     if (a.per === "once") qty = 1;
@@ -299,12 +301,53 @@ function priceBooking(cfg, d) {
       unitLabel: a.per === "hour" ? "£" + a.price + " an hour" : (a.per === "item" ? "£" + a.price + " each" : "") });
     total += a.price * qty;
   });
+  if (auto.floors > 0) {
+    extras.push({ name: "Stairs, no lift", label: "Stairs, no lift x" + auto.floors, unit: auto.perFloor, qty: auto.floors,
+      cost: auto.perFloor * auto.floors, unitLabel: "£" + auto.perFloor + " per floor above the 1st" });
+    total += auto.perFloor * auto.floors;
+  }
+  if (auto.miles > 0) {
+    var mc = Math.round(auto.miles * auto.perMile * 100) / 100;
+    extras.push({ name: "Mileage, " + auto.miles + " miles round trip", label: "Mileage, " + auto.miles + " miles round trip", unit: mc, qty: 1,
+      cost: mc, unitLabel: Math.round(auto.perMile * 100) + "p a mile from London and back" });
+    total += mc;
+  }
   total = Math.round(total * 100) / 100;
   return {
     pkg: pkg, extras: extras, total: total,
     slotLabel: slot.label + " (" + slot.time + ")",
     extrasText: extras.map(function (x) { return x.label + " " + money(x.cost); }).join(", ")
   };
+}
+
+/* Stairs and mileage. Uses the same rules as the website's quick quote. */
+function autoCharges(cfg, d) {
+  var st = cfg.STAIRS || { FREE_FLOORS: 1, PER_FLOOR: 20 };
+  var M = cfg.MILEAGE || { PER_MILE: 0.3, ROAD_FACTOR: 1.2, LONDON: { lat: 51.5074, lon: -0.1278 } };
+  function floors(acc) { var m = String(acc || "").match(/^(\d+)\D.*stairs/i); return m ? Math.max(0, +m[1] - st.FREE_FLOORS) : 0; }
+  function postcode(str) { var m = String(str || "").toUpperCase().match(/\b([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})\b/); return m ? m[1] + m[2] : null; }
+  function locate(pc) {
+    if (!pc) return null;
+    var res = UrlFetchApp.fetch("https://api.postcodes.io/postcodes/" + encodeURIComponent(pc), { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return null;
+    var x = JSON.parse(res.getContentText()).result;
+    return { lat: x.latitude, lon: x.longitude, london: x.region === "London" };
+  }
+  function dist(a, b) {
+    var R = 3958.8, t = Math.PI / 180, dLat = (b.lat - a.lat) * t, dLon = (b.lon - a.lon) * t;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(h)) * M.ROAD_FACTOR;
+  }
+  var miles = null;
+  try {
+    var a = locate(postcode(d.from)), b = locate(postcode(d.to));
+    if (a && b) miles = (a.london && b.london) ? 0 : Math.round(dist(M.LONDON, a) + dist(a, b) + dist(b, M.LONDON));
+  } catch (e) { miles = null; }
+  if (miles === null) {   // postcode service down: fall back to what the website worked out
+    var blocks = { miles100: 100, miles10: 10, miles1: 1 };
+    miles = (d.extras || []).reduce(function (t, x) { return t + (blocks[x.id] || 0) * Math.min(Math.max(Math.floor(Number(x.qty) || 0), 0), 20); }, 0);
+  }
+  return { floors: floors(d.fromAccess) + floors(d.toAccess), perFloor: st.PER_FLOOR, miles: miles, perMile: M.PER_MILE };
 }
 
 function checkDetails(cfg, d) {

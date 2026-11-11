@@ -8,6 +8,8 @@
 
   var PK = {}; C.PACKAGES.forEach(function (p) { PK[p.id] = p; });
   var AD = {}; C.ADDONS.forEach(function (a) { AD[a.id] = a; });
+  var GEO = null;            // postcode tools, set up by the quick quote below
+  var MILE_IDS = ["miles100", "miles10", "miles1"];
   var GROUP_LABEL = { flat: "Flats", house: "Houses", small: "Call outs" };
 
   var S = {
@@ -175,7 +177,7 @@
     return true;
   }
   function renderAddons() {
-    $("#addonList").innerHTML = C.ADDONS.filter(addonFits).map(function (a) {
+    $("#addonList").innerHTML = C.ADDONS.filter(function (a) { return !a.auto && addonFits(a); }).map(function (a) {
       var q = S.addons[a.id] || 0;
       var ctrl = a.per === "once"
         ? '<label class="toggle"><input type="checkbox" data-addon="' + a.id + '"' + (q ? " checked" : "") + ' aria-label="Add ' + esc(a.name) + '"><span></span></label>'
@@ -312,21 +314,32 @@
   }
 
   /* ---------- summary ---------- */
+  // Extras as the customer sees them: mileage blocks shown as one line
+  function extrasDisplay() {
+    var out = [], mileCost = 0;
+    chosenAddons().forEach(function (k) {
+      if (MILE_IDS.indexOf(k) > -1) { mileCost += addonCost(k); return; }
+      out.push({ label: addonLabel(k), cost: addonCost(k) });
+    });
+    if (mileCost > 0) out.push({ label: "Mileage, " + (S.miles || 0) + " miles round trip", cost: Math.round(mileCost * 100) / 100 });
+    return out;
+  }
   function renderSummary() {
     $("#sMove").textContent = PK[S.pkg].name + ", " + money(PK[S.pkg].price);
     $("#sDate").textContent = S.date ? prettyDate(S.date) + (S.slot ? ", " + slotById(S.slot).label.toLowerCase() + " (" + slotById(S.slot).time + ")" : "") : "Not chosen";
-    var ex = chosenAddons();
+    var ex = extrasDisplay();
     $("#sExtrasRow").hidden = !ex.length;
-    $("#sExtras").textContent = ex.map(addonLabel).join(", ");
+    $("#sExtras").textContent = ex.map(function (x) { return x.label; }).join(", ");
     $("#sTotal").textContent = money(total());
     $("#payAmt").textContent = "Pay " + money(total()) + " securely";
   }
 
   /* ---------- wizard ---------- */
   function scrollToBook() { document.getElementById("book").scrollIntoView({ behavior: "smooth", block: "start" }); }
-  function clearErr() { $("#formError").hidden = true; var st = $("#calStatus"); if (st.dataset.err) { st.textContent = ""; delete st.dataset.err; } }
+  function clearErr() { $("#formError").hidden = true; if ($("#step3Error")) $("#step3Error").hidden = true; var st = $("#calStatus"); if (st.dataset.err) { st.textContent = ""; delete st.dataset.err; } }
   function stepError(step, msg) {
     if (step === 2) { var st = $("#calStatus"); st.textContent = msg; st.dataset.err = "1"; }
+    else if (step === 3) { $("#step3Error").textContent = msg; $("#step3Error").hidden = false; }
     else { $("#formError").textContent = msg; $("#formError").hidden = false; }
   }
   function validate(step) {
@@ -349,6 +362,7 @@
         if (!v) msg = "Please fill this in.";
         else if (n === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = "Check your email address.";
         else if (n === "phone" && v.replace(/\D/g, "").length < 10) msg = "Check your mobile number.";
+        else if ((n === "from" || n === "to") && !findPostcode(v)) msg = "Please include the full postcode, for example SE1 7PB.";
         el.classList.toggle("invalid", !!msg);
         if (msg) { ok = false; var s = document.createElement("span"); s.className = "field-msg"; s.textContent = msg; el.insertAdjacentElement("afterend", s); }
       });
@@ -372,12 +386,52 @@
   $$("[data-next]").forEach(function (b) {
     b.addEventListener("click", function () {
       if (!validate(S.step)) return;
+      if (S.step === 3) {
+        var label = b.textContent; b.disabled = true; b.textContent = "Working out your price...";
+        applyAutoCharges(function (err) {
+          b.disabled = false; b.textContent = label;
+          if (err) { stepError(3, err); return; }
+          clearErr(); goStep(4);
+          var lg = $('[data-panel="4"] legend'); if (lg) { lg.setAttribute("tabindex", "-1"); lg.focus({ preventScroll: true }); }
+          scrollToBook();
+        });
+        return;
+      }
       goStep(S.step + 1);
       var legend = $('[data-panel="' + S.step + '"] legend'); if (legend) { legend.setAttribute("tabindex", "-1"); legend.focus({ preventScroll: true }); }
       scrollToBook();
     });
   });
   $$("[data-back]").forEach(function (b) { b.addEventListener("click", function () { clearErr(); goStep(S.step - 1); }); });
+
+  /* ---------- charges worked out from the customer's details ---------- */
+  function findPostcode(str) {
+    var m = String(str || "").toUpperCase().match(/\b([A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})\b/);
+    return m ? m[1] + m[2] : null;
+  }
+  function stairFloors(access) {
+    var st = C.STAIRS || { FREE_FLOORS: 1, PER_FLOOR: 20 };
+    var m = String(access || "").match(/^(\d+)\D.*stairs/i);
+    return m ? Math.max(0, +m[1] - st.FREE_FLOORS) : 0;
+  }
+  function applyAutoCharges(done) {
+    var v = formVals();
+    var floors = stairFloors(v.fromAccess) + stairFloors(v.toAccess);
+    if (floors) S.addons.stairs = floors; else delete S.addons.stairs;
+    MILE_IDS.forEach(function (k) { delete S.addons[k]; }); S.miles = 0;
+    var a = findPostcode(v.from), b = findPostcode(v.to);
+    if (!GEO) { renderSummary(); return done(); }
+    Promise.all([GEO.locate(a), GEO.locate(b)]).then(function (r) {
+      if (!r[0] || !r[1]) var bad = !r[0] ? a : b; return done("We couldn't find the postcode " + bad.slice(0, -3) + " " + bad.slice(-3) + ". Please check it and try again.");
+      if (!r[0].london || !r[1].london) {
+        var M = GEO.M, n = Math.round(GEO.miles(M.LONDON, r[0]) + GEO.miles(r[0], r[1]) + GEO.miles(r[1], M.LONDON));
+        S.miles = n;
+        var h = Math.floor(n / 100), t = Math.floor((n % 100) / 10), o = n % 10;
+        if (h) S.addons.miles100 = h; if (t) S.addons.miles10 = t; if (o) S.addons.miles1 = o;
+      }
+      renderSummary(); done();
+    }).catch(function () { done("We couldn't check your postcodes just now. Please try again in a moment."); });
+  }
 
   function formVals() {
     var f = $("#wizard"), o = {};
@@ -388,7 +442,7 @@
     var v = formVals(), sl = slotById(S.slot);
     var rows = [
       ["Move", PK[S.pkg].name + ", " + money(PK[S.pkg].price)],
-      ["Extras", chosenAddons().length ? chosenAddons().map(function (k) { return addonLabel(k) + " " + money(addonCost(k)); }).join("<br>") : "None"],
+      ["Extras", extrasDisplay().length ? extrasDisplay().map(function (x) { return esc(x.label) + " " + money(x.cost); }).join("<br>") : "None"],
       ["Date", prettyDate(S.date, true) + "<br>" + sl.label + ", " + sl.time],
       ["From", esc(v.from) + "<br><span class='muted'>" + esc(v.fromAccess) + ", " + esc(v.fromParking) + "</span>"],
       ["To", esc(v.to) + "<br><span class='muted'>" + esc(v.toAccess) + ", " + esc(v.toParking) + "</span>"],
@@ -577,6 +631,7 @@
     function showExample() {
       render("SE17PB", "LU12HN", { lat: 51.5011, lon: -0.1093, london: true }, { lat: 51.8787, lon: -0.4200, london: false }, true);
     }
+    GEO = { locate: function (pc) { return locate(pc); }, miles: miles, M: M };
     $("#qqForm").addEventListener("submit", run);
     ["#qqFrom", "#qqTo"].forEach(function (s) { $(s).addEventListener("keydown", function (e) { if (e.key === "Enter") run(e); }); });
 
