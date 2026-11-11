@@ -167,8 +167,15 @@
     }).join("");
     $$("#pkgSelect input").forEach(function (i) { i.addEventListener("change", function () { choosePkg(i.value); }); });
   }
+  function addonFits(a) {
+    var p = PK[S.pkg];
+    if (!p) return true;
+    if (a.groups && a.groups.indexOf(p.group) === -1) return false;
+    if (a.sizes && a.sizes.indexOf(p.size) === -1) return false;
+    return true;
+  }
   function renderAddons() {
-    $("#addonList").innerHTML = C.ADDONS.map(function (a) {
+    $("#addonList").innerHTML = C.ADDONS.filter(addonFits).map(function (a) {
       var q = S.addons[a.id] || 0;
       var ctrl = a.per === "once"
         ? '<label class="toggle"><input type="checkbox" data-addon="' + a.id + '"' + (q ? " checked" : "") + ' aria-label="Add ' + esc(a.name) + '"><span></span></label>'
@@ -181,6 +188,12 @@
   }
   function setAddon(id, q) {
     S.addons[id] = q;
+    // Full packing already includes materials, so the two can't both be picked
+    var clash = q > 0 && (/^packfull\d/.test(id) ? /^materials\d/ : (/^materials\d/.test(id) ? /^packfull\d/ : null));
+    if (clash) {
+      Object.keys(S.addons).forEach(function (k) { if (clash.test(k)) delete S.addons[k]; });
+      renderAddons(); renderSummary(); return;
+    }
     var row = $('[data-row="' + id + '"]');
     row.classList.toggle("on", q > 0);
     var out = $("output", row); if (out) out.textContent = q;
@@ -191,6 +204,8 @@
     var g = PK[id].group;
     if (g !== qGroup) { qGroup = g; if (HQ) setSeg($("#qGroup"), g); renderSizes(); }
     var r = document.getElementById("pk_" + id); if (r) r.checked = true;
+    Object.keys(S.addons).forEach(function (k) { if (!AD[k] || !addonFits(AD[k])) delete S.addons[k]; });
+    if ($("#addonList")) renderAddons();
     renderQuote(); renderSummary();
   }
   function syncAll() { var r = document.getElementById("pk_" + S.pkg); if (r) r.checked = true; renderSummary(); }

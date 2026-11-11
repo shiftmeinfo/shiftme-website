@@ -65,11 +65,27 @@ window.SHIFTME_CONFIG = {
 
   // Add ons customers can pick when booking.
   // per: "item" lets them choose a quantity, "hour" is charged per hour with a minimum.
+  // groups / sizes (optional) only show an add on for matching packages, e.g. sizes: [2] = 2 bedroom only.
+  // Packing prices cover the boxes, paper and tape for that size of home (see the packing materials sheet).
   ADDONS: [
     { id: "dismantle",  name: "Dismantling service",            price: 40, per: "once", note: "Furniture taken apart before the move" },
     { id: "assembly",   name: "Assembly service",               price: 40, per: "once", note: "Furniture rebuilt at your new home" },
-    { id: "packing",    name: "Packing service",                price: 40, per: "hour", min: 2, note: "£40 an hour, 2 hour minimum" },
-    { id: "materials",  name: "Packaging materials",            price: 25, per: "once", note: "Boxes, tape and wrapping" },
+
+    // Full packing: our team packs everything, all materials included
+    { id: "packfull1",  name: "Full packing, materials included", price: 260, per: "once", groups: ["flat", "house"], sizes: [1], note: "We pack your whole home. Boxes, paper and tape included" },
+    { id: "packfull2",  name: "Full packing, materials included", price: 415, per: "once", groups: ["flat", "house"], sizes: [2], note: "We pack your whole home. Boxes, paper and tape included" },
+    { id: "packfull3",  name: "Full packing, materials included", price: 595, per: "once", groups: ["flat", "house"], sizes: [3], note: "We pack your whole home. Boxes, paper and tape included" },
+    { id: "packfull4",  name: "Full packing, materials included", price: 775, per: "once", groups: ["flat", "house"], sizes: [4], note: "We pack your whole home. Boxes, paper and tape included" },
+
+    // Materials only: for customers who pack themselves
+    { id: "materials1", name: "Packing materials only, you pack", price: 140, per: "once", groups: ["flat", "house"], sizes: [1], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },
+    { id: "materials2", name: "Packing materials only, you pack", price: 215, per: "once", groups: ["flat", "house"], sizes: [2], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },
+    { id: "materials3", name: "Packing materials only, you pack", price: 315, per: "once", groups: ["flat", "house"], sizes: [3], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },
+    { id: "materials4", name: "Packing materials only, you pack", price: 415, per: "once", groups: ["flat", "house"], sizes: [4], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },
+
+    // Call outs: small jobs keep hourly packing help
+    { id: "packing",    name: "Packing service",                price: 40, per: "hour", min: 2, groups: ["small"], note: "£40 an hour, 2 hour minimum" },
+    { id: "materials",  name: "Packaging materials",            price: 25, per: "once", groups: ["small"], note: "Boxes, tape and wrapping" },
     { id: "unpacking",  name: "Unpacking service",              price: 25, per: "once", note: "We unpack your boxes at the new place" },
     { id: "bed",        name: "Bed dismantle and reassemble",   price: 45, per: "item", note: "Per bed" },
     { id: "kingbed",    name: "King size bed",                  price: 60, per: "item", note: "Dismantle and reassemble" },
