@@ -77,6 +77,9 @@ window.SHIFTME_CONFIG = {
     { id: "packfull3",  name: "Full packing, materials included", price: 595, per: "once", groups: ["flat", "house"], sizes: [3], note: "We pack your whole home. Boxes, paper and tape included" },
     { id: "packfull4",  name: "Full packing, materials included", price: 775, per: "once", groups: ["flat", "house"], sizes: [4], note: "We pack your whole home. Boxes, paper and tape included" },
 
+    // Part packing: kitchen and fragile items only. About 2 hours labour plus glass cartons, paper, boxes and tape
+    { id: "packkitchen", name: "Kitchen and fragile packing, materials included", price: 155, per: "once", groups: ["flat", "house"], note: "We pack your kitchen, glassware and fragile items" },
+
     // Materials only: for customers who pack themselves
     { id: "materials1", name: "Packing materials only, you pack", price: 140, per: "once", groups: ["flat", "house"], sizes: [1], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },
     { id: "materials2", name: "Packing materials only, you pack", price: 215, per: "once", groups: ["flat", "house"], sizes: [2], note: "Boxes, wardrobe boxes, paper and tape delivered for you to pack" },

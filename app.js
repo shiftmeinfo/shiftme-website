@@ -188,8 +188,8 @@
   }
   function setAddon(id, q) {
     S.addons[id] = q;
-    // Full packing already includes materials, so the two can't both be picked
-    var clash = q > 0 && (/^packfull\d/.test(id) ? /^materials\d/ : (/^materials\d/.test(id) ? /^packfull\d/ : null));
+    // Full packing already includes materials and the kitchen, so it can't be picked with either
+    var clash = q > 0 && (/^packfull\d/.test(id) ? /^(materials\d|packkitchen)/ : (/^(materials\d|packkitchen)/.test(id) ? /^packfull\d/ : null));
     if (clash) {
       Object.keys(S.addons).forEach(function (k) { if (clash.test(k)) delete S.addons[k]; });
       renderAddons(); renderSummary(); return;
