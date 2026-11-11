@@ -425,3 +425,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);bo
 .hero-grid{align-items:start}
 .hero-copy{padding-top:24px}
 .pk-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.callout-ok{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--light, #F2F4F7)}
+#step1Error{margin-top:10px}
+.callout-ok[hidden]{display:none}

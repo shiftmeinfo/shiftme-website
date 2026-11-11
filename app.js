@@ -139,7 +139,7 @@
     var list = C.PACKAGES.filter(function (p) { return p.id === "s1"; }).concat(C.PACKAGES.filter(function (p) { return p.group === "flat"; }));
     var cards = list.map(function (p) {
       return { id: p.id, name: p.group === "small" ? "Small move" : p.name, price: (p.group === "small" ? "from " : "") + money(p.price),
-        desc: p.group === "small" ? "A few items or one big piece. Ideal for Marketplace buys and flat pack collections." : p.items.slice(0, 3).map(function (x, i) { return i ? x.charAt(0).toLowerCase() + x.slice(1) : x; }).join(", ") + " and more." };
+        desc: p.group === "small" ? "Up to " + C.CALL_OUT.MAX_ITEMS + " and " + C.CALL_OUT.MAX_HOURS + " hours. Ideal for Marketplace buys and flat pack collections." : p.items.slice(0, 3).map(function (x, i) { return i ? x.charAt(0).toLowerCase() + x.slice(1) : x; }).join(", ") + " and more." };
     });
     if (houses.length) cards.push({ id: houses[0].id, name: "Houses", price: "from " + money(houses[0].price),
       desc: "1 to " + houses[houses.length - 1].size + " bedrooms, washing machine and fridge freezer included." });
@@ -206,6 +206,12 @@
     var r = document.getElementById("pk_" + id); if (r) r.checked = true;
     Object.keys(S.addons).forEach(function (k) { if (!AD[k] || !addonFits(AD[k])) delete S.addons[k]; });
     if ($("#addonList")) renderAddons();
+    var co = $("#calloutOk");
+    if (co) {
+      co.hidden = g !== "small";
+      $("#calloutText").textContent = "My move is up to " + C.CALL_OUT.MAX_ITEMS + ", not a full flat or house. I understand it includes up to " + C.CALL_OUT.MAX_HOURS + " hours, extra time is £" + C.CALL_OUT.EXTRA_HOUR + " an hour, and if there's more, ShiftMe will move me to the right package and charge the difference.";
+      $("#step1Error").hidden = true;
+    }
     renderQuote(); renderSummary();
   }
   function syncAll() { var r = document.getElementById("pk_" + S.pkg); if (r) r.checked = true; renderSummary(); }
@@ -324,6 +330,13 @@
     else { $("#formError").textContent = msg; $("#formError").hidden = false; }
   }
   function validate(step) {
+    if (step === 1) {
+      var e1 = $("#step1Error"); e1.hidden = true;
+      if (PK[S.pkg].group === "small" && !$("#wizard").elements.calloutOk.checked) {
+        e1.textContent = "Please tick the box to confirm your move fits a call out, or pick a flat or house package.";
+        e1.hidden = false; return false;
+      }
+    }
     if (step === 2) {
       if (!S.date) { stepError(2, "Pick a date to continue."); return false; }
       if (!S.slot) { stepError(2, "Pick a morning or afternoon arrival."); return false; }
@@ -400,7 +413,8 @@
       name: v.name, phone: v.phone, email: v.email,
       from: v.from, fromAccess: v.fromAccess, fromParking: v.fromParking,
       to: v.to, toAccess: v.toAccess, toParking: v.toParking,
-      notes: v.notes, website: v.website
+      notes: (PK[S.pkg].group === "small" ? "[Customer confirmed call out limits: up to " + C.CALL_OUT.MAX_ITEMS + ", " + C.CALL_OUT.MAX_HOURS + " hours] " : "") + v.notes,
+      website: v.website
     };
     S.submitting = true;
     var btn = $("#submitBtn"), btnHtml = btn.innerHTML; btn.disabled = true; btn.textContent = "Opening secure payment…";

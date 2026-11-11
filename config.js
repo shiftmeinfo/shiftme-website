@@ -31,6 +31,9 @@ window.SHIFTME_CONFIG = {
     LONDON: { lat: 51.5074, lon: -0.1278 }   // Charing Cross, where mileage is counted from
   },
 
+  // Call out limits. Shown on the site and in the box customers tick when booking a call out.
+  CALL_OUT: { MAX_ITEMS: "5 items or 10 boxes", MAX_HOURS: 2, EXTRA_HOUR: 45 },
+
   // Contact details
   PHONE_DISPLAY: "020 3488 8610",
   PHONE_LINK: "+442034888610",
@@ -58,9 +61,9 @@ window.SHIFTME_CONFIG = {
       items: ["King size bed and 3 double beds with mattresses", "5 bedside tables", "2 double wardrobes and 2 wardrobes", "Chest of drawers", "Kitchen table and 6 chairs", "Washing machine", "Fridge freezer", "Microwave", "Coffee table", "TV and stand", "3 seater sofa", "Armchair", "Up to 35 large and 15 medium boxes", "4 suitcases"] },
 
     { id: "s1", group: "small", size: 1, name: "Call out, 1 mover",  price: 83,  load: 1,
-      items: ["A few items or a single piece of furniture", "One mover and the van", "Call out charge, final price confirmed before the day"] },
+      items: ["Up to 5 items or 10 boxes", "One mover and the van for up to 2 hours", "Extra time is £45 an hour, billed before your move"] },
     { id: "s2", group: "small", size: 2, name: "Call out, 2 movers", price: 124.5, load: 2,
-      items: ["Heavier or bulky items like sofas and fridges", "Two movers and the van", "Call out charge, final price confirmed before the day"] }
+      items: ["Up to 5 items or 10 boxes, including bulky ones like sofas and fridges", "Two movers and the van for up to 2 hours", "Extra time is £45 an hour, billed before your move"] }
   ],
 
   // Add ons customers can pick when booking.
@@ -88,15 +91,21 @@ window.SHIFTME_CONFIG = {
 
     // Call outs: small jobs keep hourly packing help
     { id: "packing",    name: "Packing service",                price: 40, per: "hour", min: 2, groups: ["small"], note: "£40 an hour, 2 hour minimum" },
-    { id: "materials",  name: "Packaging materials",            price: 25, per: "once", groups: ["small"], note: "Boxes, tape and wrapping" },
-    { id: "unpacking",  name: "Unpacking service",              price: 25, per: "once", note: "We unpack your boxes at the new place" },
+    { id: "materials",  name: "Packaging materials, up to 5 boxes", price: 25, per: "once", groups: ["small"], note: "5 boxes, tape and bubble wrap" },
+
+    // Unpacking: priced by home size (about 2, 3, 4 or 5 hours at £40 an hour)
+    { id: "unpacking",  name: "Unpacking, up to 10 boxes",      price: 25,  per: "once", groups: ["small"], note: "We unpack your boxes at the new place" },
+    { id: "unpack1",    name: "Unpacking service",              price: 80,  per: "once", groups: ["flat", "house"], sizes: [1], note: "We unpack your boxes at the new place" },
+    { id: "unpack2",    name: "Unpacking service",              price: 120, per: "once", groups: ["flat", "house"], sizes: [2], note: "We unpack your boxes at the new place" },
+    { id: "unpack3",    name: "Unpacking service",              price: 160, per: "once", groups: ["flat", "house"], sizes: [3], note: "We unpack your boxes at the new place" },
+    { id: "unpack4",    name: "Unpacking service",              price: 200, per: "once", groups: ["flat", "house"], sizes: [4], note: "We unpack your boxes at the new place" },
     { id: "bed",        name: "Bed dismantle and reassemble",   price: 45, per: "item", note: "Per bed" },
     { id: "kingbed",    name: "King size bed",                  price: 60, per: "item", note: "Dismantle and reassemble" },
     { id: "wardrobe",   name: "Standard wardrobe",              price: 55, per: "item", note: "Dismantle and reassemble" },
     { id: "bigwardrobe",name: "Large or double wardrobe",       price: 70, per: "item", note: "Dismantle and reassemble" },
     { id: "table",      name: "Dining table",                   price: 35, per: "item", note: "Dismantle and reassemble" },
     { id: "otherlarge", name: "Other large furniture",          price: 45, per: "item", note: "Dismantle and reassemble" },
-    { id: "labour",     name: "Extra labour",                   price: 45, per: "hour", min: 1, note: "£45 an hour for extra item work" },
+    { id: "labour",     name: "Extra time",                     price: 45, per: "hour", min: 1, note: "£45 an hour. Book it now if your job may run over" },
     { id: "waiting",    name: "2 hours waiting time",           price: 70, per: "item", note: "If you need us to wait on the day" }
   ],
 
